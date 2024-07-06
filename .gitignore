@@ -33,3 +33,5 @@
 
 # DS_store
 .DS_store
+.vscode/c_cpp_properties.json
+HostCode/.DS_Store
