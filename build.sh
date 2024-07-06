@@ -10,9 +10,9 @@ default_freq=$3
 source /opt/xilinx/xrt/setup.sh
 source /home/xilinx/software/Vitis_HLS/2023.1/settings64.sh
 
-sed -i "s/^#define D.*/#define D ${code_length}/" Design/Defines.h
-sed -i "/#define[[:space:]]\+D[[:space:]]\+[0-9]\+/s/[0-9]\+/${code_length}/" HostCode/host.h
-sed -i '/#define CBUILD/s/^/\/\//' Design/Controller.cpp
+sed -i "s/^#define D.*/#define D ${code_length}/" Design/smith_waterman.hpp
+sed -i "/#define[[:space:]]\+D[[:space:]]\+[0-9]\+/s/[0-9]\+/${code_length}/" HostCode/host.hpp
+sed -i '/#define CBUILD/s/^/\/\//' Design/smith_waterman.cpp
 
 
 make all TARGET=hw PLATFORM=${platform} FREQ_MHZ=${default_freq}
