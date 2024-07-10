@@ -33,5 +33,11 @@
 
 # DS_store
 .DS_store
-.vscode/c_cpp_properties.json
 HostCode/.DS_Store
+
+# VScode
+.vscode
+_x.sw_emu.xilinx_u55c_gen3x16_xdma_3_202210_1
+build_dir.sw_emu.xilinx_u55c_gen3x16_xdma_3_202210_1
+computeSW
+sw_maxi
