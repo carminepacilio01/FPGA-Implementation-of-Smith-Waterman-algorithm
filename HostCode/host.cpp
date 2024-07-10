@@ -39,24 +39,7 @@ int main(int argc, char* argv[]){
 	//	Buffers to store results of computations
     int score[INPUT_SIZE];
 
-	///////Generation of random sequences
-	for(int i = 0; i < INPUT_SIZE; i++){
-
-		//	generate random length of the sequences
-		lenT[i] = (int)  gen_rnd(MAX_SEQ_LEN - 10, MAX_SEQ_LEN - 2);
-		lenD[i] = (int)  gen_rnd(MAX_SEQ_LEN - 10, MAX_SEQ_LEN - 2);
-
-		lenT[i] += 1;
-		lenD[i] += 1;
-
-		//	generate rand sequences
-		target[i][0] = database[i][0] = '-';
-		target[i][lenT[i]] = database[i][lenT[i]] = '\0';
-		random_seq_gen(lenT[i], target[i], lenD[i], database[i]);
-
-		//	Printing current configuration
-		printConf(target[i], database[i], ws, wd, gap_opening, enlargement);
-	}
+	printf("Programmin FPGA Device. \n");
 
 /////////////////////////		OPENCL CONFIGURATION 		////////////////////////////////////
 
@@ -127,6 +110,28 @@ int main(int argc, char* argv[]){
 
     q.finish();
 
+/////////////////////////		DATASET GENERATION 		////////////////////////////////////
+
+	printf("Generating %d random sequences pair \n", INPUT_SIZE);
+	///////Generation of random sequences
+	for(int i = 0; i < INPUT_SIZE; i++){
+
+		//	generate random length of the sequences
+		lenT[i] = (int)  gen_rnd(MAX_SEQ_LEN - 10, MAX_SEQ_LEN - 2);
+		lenD[i] = (int)  gen_rnd(MAX_SEQ_LEN - 10, MAX_SEQ_LEN - 2);
+
+		lenT[i] += 1;
+		lenD[i] += 1;
+
+		//	generate rand sequences
+		target[i][0] = database[i][0] = '-';
+		target[i][lenT[i]] = database[i][lenT[i]] = '\0';
+		random_seq_gen(lenT[i], target[i], lenD[i], database[i]);
+
+		//	Printing current configuration
+		printConf(target[i], database[i], ws, wd, gap_opening, enlargement);
+	}
+
 /////////////////////////		KERNEL EXCECUTION 		////////////////////////////////////
 
 	OCL_CHECK(err, err = sw_maxi.setArg(0, lenT_buffer));
@@ -140,10 +145,12 @@ int main(int argc, char* argv[]){
     OCL_CHECK(err, err = sw_maxi.setArg(8, score_buffer));
 	OCL_CHECK(err, err = sw_maxi.setArg(9, INPUT_SIZE));
 
+	printf("Copying input sequences on the FPGA. \n");
     // Data will be migrated to kernel space
     OCL_CHECK(err, q.enqueueMigrateMemObjects({lenT_buffer, target_buffer, lenD_buffer, database_buffer}, 0)); /*0 means from host*/
 	OCL_CHECK(err, q.finish());
 
+	printf("Running FPGA accelerator. \n");
 	auto start = std::chrono::high_resolution_clock::now();
 
 	//Launch the Kernel
@@ -155,8 +162,8 @@ int main(int argc, char* argv[]){
     auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
 	float gcup = (double) (MAX_SEQ_LEN * MAX_SEQ_LEN / (float)duration.count() ) * 1e-9;
 
-
-    printf("Code excecuted on FPGA kernel in %f ns \n", (float)duration.count());
+	printf("Finished FPGA excecution. \n");
+    printf("FPGA Kernel executed in %f ns \n", (float)duration.count());
 	printf("GCUPS: %f \n",gcup);
 	
 	//Data from Kernel to Host
@@ -166,6 +173,7 @@ int main(int argc, char* argv[]){
 /////////////////////////			TESTBENCH			////////////////////////////////////
 	int golden_score[INPUT_SIZE];
 
+	printf("Running Software version. \n");
 	start = std::chrono::high_resolution_clock::now();
 
 	for (int golden_rep = 0; golden_rep < INPUT_SIZE; golden_rep++) {
@@ -175,19 +183,20 @@ int main(int argc, char* argv[]){
 	stop = std::chrono::high_resolution_clock::now();
 	duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
 	
-	printf("Code excecuted on HOST in %f ns \n", (float)duration.count());
+	printf("Software version executed in %f ns \n", (float)duration.count());
 
 	////////test bench results
+	printf("Comparing results. \n");
 	for(int i; i < INPUT_SIZE; i++){
 		if(score[i] != golden_score[i]){
-			printf("The execution terminated becasue of a mismatch! \n");
+			printf("Test FAILED: Output does not match reference.\n");
 			printf("Golden Score: %d | Kernel Score: %d \n ", golden_score[i], score[i]);
 			printConf(target[i], database[i], ws, wd, gap_opening, enlargement);
 			return EXIT_FAILURE;
 		}
 	}
 
-	printf("Execution terminated Succesfully!");
+	printf("Test PASSED: Output matches reference.\n");
 
 	return 0;
 }
