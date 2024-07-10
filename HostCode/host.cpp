@@ -23,23 +23,23 @@ int main(int argc, char* argv[]){
 		return EXIT_FAILURE;
 	}
 
-    srandom(2);
+    srandom(SEED);
 
 	const int wd 			=  1; 	// match score
 	const int ws 			= -1;	// mismatch score
 	const int gap_opening	= -3;
 	const int enlargement 	= -1;
 
-	//////Input buffers
+	//	Input buffers
 	int lenT[INPUT_SIZE];
 	int lenD[INPUT_SIZE];
 	char target[INPUT_SIZE][MAX_SEQ_LEN];
 	char database[INPUT_SIZE][MAX_SEQ_LEN];
 
-	//////Buffers to store results of computations
+	//	Buffers to store results of computations
     int score[INPUT_SIZE];
-	int golden_score[INPUT_SIZE];
 
+	///////Generation of random sequences
 	for(int i = 0; i < INPUT_SIZE; i++){
 
 		//	generate random length of the sequences
@@ -164,23 +164,30 @@ int main(int argc, char* argv[]){
 	q.finish();
 
 /////////////////////////			TESTBENCH			////////////////////////////////////
-
-	double mean_golden_time = 0;
-	double mean_golden_gcup = 0;
+	int golden_score[INPUT_SIZE];
 
 	start = std::chrono::high_resolution_clock::now();
 
 	for (int golden_rep = 0; golden_rep < INPUT_SIZE; golden_rep++) {
-
-		auto start = clock();
 		golden_score[golden_rep] = compute_golden(lenT[golden_rep], target[golden_rep], lenD[golden_rep], database[golden_rep], wd, ws, gap_opening, enlargement);
-		auto end = clock();
 	}
 
 	stop = std::chrono::high_resolution_clock::now();
 	duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
 	
 	printf("Code excecuted on HOST in %f ns \n", (float)duration.count());
+
+	////////test bench results
+	for(int i; i < INPUT_SIZE; i++){
+		if(score[i] != golden_score[i]){
+			printf("The execution terminated becasue of a mismatch! \n");
+			printf("Golden Score: %d | Kernel Score: %d \n ", golden_score[i], score[i]);
+			printConf(target[i], database[i], ws, wd, gap_opening, enlargement);
+			return EXIT_FAILURE;
+		}
+	}
+
+	printf("Execution terminated Succesfully!");
 
 	return 0;
 }
