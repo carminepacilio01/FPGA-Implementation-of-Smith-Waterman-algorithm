@@ -24,8 +24,8 @@ help:
 endif
 
 ############################## Setting up Project Variables ##############################
-KERNEL_NAME :=QUEKUF
-KERNEL_FUNCTION := decoderTop
+KERNEL_NAME := sw_maxi
+KERNEL_FUNCTION := sw_maxi
 TARGET := sw_emu
 JOBS := 8
 VPP_LDFLAGS :=
@@ -56,8 +56,7 @@ LDFLAGS += -lrt -lstdc++
 ############################## Setting up Kernel Variables ##############################
 # Kernel compiler global settings
 VPP_FLAGS += --save-temps --vivado.synth.jobs $(JOBS) --vivado.impl.jobs $(JOBS) --hls.jobs $(JOBS)
-KERN_SRCS += Design/DecoderMain.cpp Design/DecoderMain.h Design/ClusterUnit.cpp Design/ClusterUnit.h Design/Controller.cpp Design/Controller.h Design/Defines.h Design/SurfaceCode.cpp Design/SurfaceCode.h Design/Vector.h
-
+KERN_SRCS += Design/smith_waterman.cpp Design/smith_waterman.hpp
 
 EXECUTABLE = ./$(KERNEL_NAME)
 EMCONFIG_DIR = $(TEMP_DIR)
@@ -80,7 +79,7 @@ build: check-vitis check-device $(BUILD_DIR)/$(KERNEL_NAME).xclbin
 xclbin: build
 
 ############################## Setting Rules for Binary Containers (Building Kernels) ##############################
-$(TEMP_DIR)/$(KERNEL_NAME).xo: Design/DecoderMain.cpp
+$(TEMP_DIR)/$(KERNEL_NAME).xo: Design/smith_waterman.cpp
 	mkdir -p $(TEMP_DIR)
 	v++ -c $(VPP_FLAGS) $(VPP_CFLAGS) -t $(TARGET) --platform $(PLATFORM) -k $(KERNEL_FUNCTION) --temp_dir $(TEMP_DIR)  -I'$(<D)' -o'$@' $(KERN_SRCS)
 
