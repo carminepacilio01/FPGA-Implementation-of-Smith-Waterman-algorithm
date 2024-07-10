@@ -5,8 +5,7 @@
 #include <string.h>
 #include <vector>
 #include <limits>
-//#include <hls_stream.h>
-//#include <ap_int.h>
+
 
 
 #define MAX_DIM 1024
