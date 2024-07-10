@@ -1,84 +1,107 @@
 #include "host.h"
+#include <random>
+#include <time.h>
 
-float startExecution(cl::CommandQueue& q, cl::Kernel& decoderUF, cl::Buffer& syn, cl::Buffer& corrOut, cl::Buffer& totalClocks)
-{
-	cl_int err;
-	OCL_CHECK(err, err = decoderUF.setArg(0, syn));
-	OCL_CHECK(err, err = decoderUF.setArg(1, corrOut));
-    OCL_CHECK(err, err = decoderUF.setArg(2, totalClocks));
+#include "common/xcl2.hpp"
 
+#define MAX_SEQ_LEN 1000
 
-    // Data will be migrated to kernel space
-    q.enqueueMigrateMemObjects({syn}, 0); /*0 means from host*/
-	q.finish();
+#define NUM_KERNEL 1
 
-	auto start=std::chrono::high_resolution_clock::now();
+#define MAX_HBM_BANKCOUNT 32
+#define BANK_NAME(n) n | XCL_MEM_TOPOLOGY
+const int bank[MAX_HBM_BANKCOUNT] = {
+    BANK_NAME(0),  BANK_NAME(1),  BANK_NAME(2),  BANK_NAME(3),  BANK_NAME(4),
+    BANK_NAME(5),  BANK_NAME(6),  BANK_NAME(7),  BANK_NAME(8),  BANK_NAME(9),
+    BANK_NAME(10), BANK_NAME(11), BANK_NAME(12), BANK_NAME(13), BANK_NAME(14),
+    BANK_NAME(15), BANK_NAME(16), BANK_NAME(17), BANK_NAME(18), BANK_NAME(19),
+    BANK_NAME(20), BANK_NAME(21), BANK_NAME(22), BANK_NAME(23), BANK_NAME(24),
+    BANK_NAME(25), BANK_NAME(26), BANK_NAME(27), BANK_NAME(28), BANK_NAME(29),
+    BANK_NAME(30), BANK_NAME(31)};
 
-	//Launch the Kernel
-	q.enqueueTask(decoderUF);
-	q.finish();
-	
-	auto stop=std::chrono::high_resolution_clock::now();
-
-    auto duration=std::chrono::duration_cast<std::chrono::nanoseconds>(stop-start);
-
-    printf("Operation concluded in %f nanoseconds\n", (float)duration.count());
-	
-	
-	//Data from Kernel to Host
-	q.enqueueMigrateMemObjects({corrOut, totalClocks},CL_MIGRATE_MEM_OBJECT_HOST);
-	q.finish();
-	
-	return (float)duration.count();
-}
+void printConf(char *seqA, char *seqB, int ws, int wd, int gap_opening, int enlargement);
+void fprintMatrix(int *P, int *D, int *Q, int lenA, int lenB);
+int compute_golden(int lenA, char *seqA, int lenB, char *seqB, int wd, int ws, int gap_opening, int enlargement);
+void random_seq_gen(int lenA, char *seqA, int lenB, char *seqB);
+int gen_rnd(int min, int max);
 
 int main(int argc, char* argv[]){
 	
 	//TARGET_DEVICE macro needs to be passed from gcc command line
-	if(argc != 3) {
-		std::cout << "Usage: " << argv[0] <<" <xclbin> <dataset path>" << std::endl;
+	// if(argc != 3) {
+	// 	std::cout << "Usage: " << argv[0] <<" <xclbin> <dataset path>" << std::endl;
+	// 	return EXIT_FAILURE;
+	// }
+
+    // FILE* f = fopen(argv[2], "r");
+
+    if(argc < 2) {
+		std::cout << "Usage: " << argv[0] <<" <xclbin>" << std::endl;
 		return EXIT_FAILURE;
 	}
-
-    FILE* f = fopen(argv[2], "r");
     
-    double frequency = 350000000;
+    // double frequency = 350000000;
 
-    int accuracy = 0;
+    srandom(2);
+	// clock_t start, end;
 
-	std::vector<uint8_t, aligned_allocator<uint8_t>> syndrome_in(SYN_LEN);
-	std::vector<uint8_t, aligned_allocator<uint8_t>> correction_out(CORR_LEN);
-    std::vector<uint64_t, aligned_allocator<uint64_t>> totalClocks(1);
-    int logicals[K][CORR_LEN] = {0};
-    int check[K] = {0};
-    int bitstring[K] = {0};
+	//	match score
+	const int wd = 1;
+	//	mismatch score
+	const int ws = -1;
 
-    fgetc(f); //first bracket
-    fgetc(f); //second bracket
-    for(int i=0; i<K && !feof(f); i++){
+	const int gap_opening = -3;
+	const int enlargement = -1;
 
-        for(int j=0; j<CORR_LEN && !feof(f); j++){
-            logicals[i][j]=fgetc(f)-48;
-            fgetc(f);//space or bracket
-        }
+	const int n = INPUT_SIZE;
+	int lenA[INPUT_SIZE];
+	int lenB[INPUT_SIZE];
+	char seqA[INPUT_SIZE][MAX_DIM];
+	char seqB[INPUT_SIZE][MAX_DIM];
 
-        fgetc(f);//end of line
-        fgetc(f);//space
-        fgetc(f);//bracket
-    }
+	for(int i = 0; i < n; i++){
 
+		//	generate random sequences
+		//	length of the sequences
+		lenA[i] = (int)  gen_rnd(MAX_SEQ_LEN - 10, MAX_SEQ_LEN - 2);
+		lenB[i] = (int)  gen_rnd(MAX_SEQ_LEN - 10, MAX_SEQ_LEN - 2);
 
-	double decodeAVG = 0;
-	double clocksAVG = 0;
+		lenA[i] += 1;
+		lenB[i] += 1;
 
+		//	sequences
+		//seqA[i] = (char *) malloc(sizeof(char) * (lenA[i]));
+		//seqB[i] = (char *) malloc(sizeof(char) * (lenB[i]));
 
-	size_t syndrome_size = sizeof(bool) * SYN_LEN;
-	size_t correction_out_size = sizeof(bool) * CORR_LEN;
-    size_t totalClocks_size = sizeof(int64_t);
+		//	generate rand sequences
+		seqA[i][0] = seqB[i][0] = '-';
+		seqA[i][lenA[i]] = seqB[i][lenA[i]] = '\0';
+		random_seq_gen(lenA[i], seqA[i], lenB[i], seqB[i]);
 
+		//	Printing current configuration
+	}
 
+    int score[INPUT_SIZE];
+	int golden_score[INPUT_SIZE];
+	int n_ops = 0;
+
+	double mean_golden_time = 0;
+	double mean_golden_gcup = 0;
+
+	for (int golden_rep = 0; golden_rep < n; golden_rep++) {
+
+		auto start = clock();
+		golden_score[golden_rep] = compute_golden(lenA[golden_rep], seqA[golden_rep], lenB[golden_rep], seqB[golden_rep], wd, ws, gap_opening, enlargement);
+		auto end = clock();
+
+		n_ops = lenA[golden_rep]*lenB[golden_rep];
+		double cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+		double gcup = (double) (n_ops / cpu_time_used )  * 1e-9;
+
+		mean_golden_time += cpu_time_used;
+		mean_golden_gcup += gcup;
+	}
 	
-    
 
 /*
 ================================================================================================================================
@@ -86,19 +109,16 @@ int main(int argc, char* argv[]){
 ================================================================================================================================
 */
 
-   	std::string binaryFile = argv[1];
+   	std::string binaryFile = argv[1]; // prendo il bitstream 
+    auto fileBuf = xcl::read_binary_file(binaryFile); // leggi bitstream
+    cl::Program::Binaries bins{{fileBuf.data(), fileBuf.size()}};
 
-    
     cl_int err;
     cl::Context context;
-    cl::Kernel decoderUF;
+    cl::Kernel sw_maxi;
     cl::CommandQueue q;
 
-    auto devices = xcl::get_xil_devices();
-
-    auto fileBuf = xcl::read_binary_file(binaryFile);
-
-    cl::Program::Binaries bins{{fileBuf.data(), fileBuf.size()}};
+    auto devices = xcl::get_xil_devices(); // lista di devices
 
     bool valid_device = false;
 
@@ -113,7 +133,7 @@ int main(int argc, char* argv[]){
             std::cout << "Failed to program device[" << i << "] with xclbin file!\n";
         } else {
             std::cout << "Device[" << i << "]: program successful!\n";
-            OCL_CHECK(err, decoderUF= cl::Kernel(program, "decoderTop", &err));
+            OCL_CHECK(err, sw_maxi= cl::Kernel(program, "decoderTop", &err));
             valid_device = true;
             break; // we break because we found a valid device
         }
@@ -123,73 +143,140 @@ int main(int argc, char* argv[]){
         exit(EXIT_FAILURE);
     }
 
-    cl::Buffer buffer_syn(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, syndrome_size, syndrome_in.data());
-    cl::Buffer correction_out_buf(context, CL_MEM_USE_HOST_PTR | CL_MEM_WRITE_ONLY, correction_out_size, correction_out.data());
-    cl::Buffer totalClocks_Buf(context, CL_MEM_USE_HOST_PTR | CL_MEM_WRITE_ONLY, totalClocks_size, totalClocks.data());
+    cl_mem_ext_ptr_t lenT_buffer_ext;
+    cl_mem_ext_ptr_t target_buffer_ext;
+    cl_mem_ext_ptr_t lenD_buffer_ext;
+    cl_mem_ext_ptr_t database_buffer_ext;
+    cl_mem_ext_ptr_t score_buffer_ext;
 
+    lenT_buffer_ext.param = 0;
+    lenD_buffer_ext.param = 0;
+    target_buffer_ext.param = 0;
+    database_buffer_ext.param = 0;
+    score_buffer_ext.param = 0;
+
+    lenT_buffer_ext.flags = bank[0];
+    target_buffer_ext.flags = bank[1];
+    lenD_buffer_ext.flags = bank[2];
+    database_buffer_ext.flags = bank[3];
+    score_buffer_ext.flags = bank[4];
+
+    lenT_buffer_ext.obj = lenA;
+    target_buffer_ext.obj = seqA;
+    lenD_buffer_ext.obj = lenB;
+    database_buffer_ext.obj = seqB;
+    score_buffer_ext.obj = score;
+
+    cl::Buffer lenT_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, INPUT_SIZE * sizeof(int), &lenT_buffer_ext);
+    cl::Buffer target_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, INPUT_SIZE * MAX_DIM * sizeof(char), &target_buffer_ext);
+    cl::Buffer lenD_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, INPUT_SIZE * sizeof(int), &lenD_buffer_ext);
+    cl::Buffer database_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, INPUT_SIZE * MAX_DIM * sizeof(char), &database_buffer_ext);
+    cl::Buffer score_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_WRITE_ONLY, INPUT_SIZE * sizeof(int), &score_buffer_ext);
+
+    q.finish();
 /*
 ================================================================================================================================
 	MY STUFF
 ================================================================================================================================
 */
 
-	float clocksAVGArr[200] = {0}; 
+	OCL_CHECK(err, err = sw_maxi.setArg(0, lenT_buffer));
+	OCL_CHECK(err, err = sw_maxi.setArg(1, target_buffer));
+    OCL_CHECK(err, err = sw_maxi.setArg(2, lenD_buffer));
+    OCL_CHECK(err, err = sw_maxi.setArg(3, database_buffer));
+    OCL_CHECK(err, err = sw_maxi.setArg(4, wd));
+    OCL_CHECK(err, err = sw_maxi.setArg(5, ws));
+    OCL_CHECK(err, err = sw_maxi.setArg(6, gap_opening));
+    OCL_CHECK(err, err = sw_maxi.setArg(7, enlargement));
+    OCL_CHECK(err, err = sw_maxi.setArg(8, score_buffer));
 
-	int totalDecodes = 0;
+    // Data will be migrated to kernel space
+    OCL_CHECK(err, q.enqueueMigrateMemObjects({lenT_buffer, target_buffer, lenD_buffer, database_buffer}, 0)); /*0 means from host*/
+	OCL_CHECK(err, q.finish());
 
-    while(!feof(f))
-    {
-        for (int i = 0; i < SYN_LEN && !feof(f); i++) {
-            syndrome_in[i] = fgetc(f) - 48;
-            fgetc(f);//space
-        }
-
-        fgetc(f);//end of line
-        fgetc(f);//first square bracket
-
-        for (int i = 0; i < K && !feof(f); i++) {
-            check[i] = fgetc(f) - 48;
-            fgetc(f); //space or bracket
-        }
-
-        fgetc(f);//end of line
-        fgetc(f); //next square bracket
-
-        decodeAVG += startExecution(q, decoderUF, buffer_syn, correction_out_buf, totalClocks_Buf);
-	clocksAVG += totalClocks[0];
-	clocksAVGArr[totalDecodes] = totalClocks[0];
-
-        for (int i = 0; i < K; i++) {
-            bitstring[i] = 0;
-
-            for (int j = 0; j < CORR_LEN; j++)
-                bitstring[i] += logicals[i][j] * correction_out[j];
-
-            bitstring[i] = bitstring[i] % 2;
-        }
-
-        if (check[0] == bitstring[0] && check[1] == bitstring[1]) {
-            accuracy++;
-        }
-		totalDecodes++;
-    }
-
-	float distanceSum = 0;
-	float mean = (float)clocksAVG/totalDecodes;
-//Standard Deviation Computation
-	for(int i = 0; i < totalDecodes; i++)
-	{
-		distanceSum += (mean - clocksAVGArr[i])*(mean - clocksAVGArr[i]);
-	}
+	auto start = std::chrono::high_resolution_clock::now();
+	//Launch the Kernel
+	q.enqueueTask(sw_maxi);
+	OCL_CHECK(err, q.finish());
 	
-	float SD = sqrt(distanceSum / totalDecodes);
+	auto stop = std::chrono::high_resolution_clock::now();
+
+    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
+
+    printf("Operation concluded in %f nanoseconds\n", (float)duration.count());
 	
-		
-	printf("Decode AVG: %lf\n", (double)(clocksAVG*1000000.0)/(totalDecodes*frequency));
-    	printf("Clock Cycles AVG: %f\n", (double)clocksAVG/totalDecodes);
-	printf("Standard Deviation; %f\n", SD);
-	printf("Correct/Total_Decodes: %d / %d\n", accuracy, totalDecodes); 
+	
+	//Data from Kernel to Host
+	q.enqueueMigrateMemObjects({score_buffer}, CL_MIGRATE_MEM_OBJECT_HOST);
+	q.finish();
+	
+	
 
 	return 0;
 }
 
+//	Prints the current configuration
+void printConf(char *seqA, char *seqB, int ws, int wd, int gap_opening, int enlargement) {
+	std::cout << std::endl << "+++++++++++++++++++++" << std::endl;
+	std::cout << "+ Sequence A: [" << strlen(seqA) << "]: " << seqA << std::endl;
+	std::cout << "+ Sequence B: [" << strlen(seqB) << "]: " << seqB << std::endl;
+	std::cout << "+ Match Score: " << wd << std::endl;
+	std::cout << "+ Mismatch Score: " << ws << std::endl;
+	std::cout << "+ Gap Opening: " << gap_opening << std::endl;
+	std::cout << "+ Enlargement: " << enlargement << std::endl;
+	std::cout << "+++++++++++++++++++++" << std::endl;
+}
+
+int gen_rnd(int min, int max) {
+     // Using random function to get random double value
+    return (int) min + rand() % (max - min + 1);
+}
+
+void random_seq_gen(int lenA, char *seqA, int lenB, char *seqB) {
+
+	int i; 
+	for(i = 1; i < lenA; i++){
+		int tmp_gen = gen_rnd(0, 3);
+		seqA[i] = (tmp_gen == 0) ? 'A' :
+				  (tmp_gen == 1) ? 'C' :
+			      (tmp_gen == 2) ? 'G' : 'T';
+	}
+
+	for(i = 1; i < lenB; i++){
+		int tmp_gen = gen_rnd(0, 3);
+		seqB[i] = (tmp_gen == 0) ? 'A' :
+				  (tmp_gen == 1) ? 'C' :
+				  (tmp_gen == 2) ? 'G' : 'T';
+	}
+}
+
+int compute_golden(int lenA, char *seqA, int lenB, char *seqB, int wd, int ws, int gap_opening, int enlargement) {
+	// Inizializza le matrici D, P, Q
+	    std::vector< std::vector<int> > D(lenA, std::vector<int>(lenB, 0));
+	    std::vector< std::vector<int> > P(lenA, std::vector<int>(lenB, std::numeric_limits<int>::min() / 2));
+	    std::vector< std::vector<int> > Q(lenA, std::vector<int>(lenB, std::numeric_limits<int>::min() / 2));
+
+	    int gap_penalty = gap_opening + enlargement * 1;
+	    int max_score = 0;
+
+	    for (int i = 1; i < lenA; ++i) {
+	        for (int j = 1; j < lenB; ++j) {
+	            // Calcola P[i][j]
+	            P[i][j] = std::max(P[i-1][j] + enlargement, D[i-1][j] + gap_penalty);
+
+	            // Calcola Q[i][j]
+	            Q[i][j] = std::max(Q[i][j-1] + enlargement, D[i][j-1] + gap_penalty);
+
+	            // Calcola D[i][j]
+	            int match = (seqA[i] == seqB[j]) ? wd : ws;
+	            D[i][j] = std::max(0, D[i-1][j-1] + match);
+	            D[i][j] = std::max(D[i][j], P[i][j]);
+	            D[i][j] = std::max(D[i][j], Q[i][j]);
+
+	            // Aggiorna lo score massimo
+	            max_score = std::max(max_score, D[i][j]);
+	        }
+	    }
+
+	    return max_score;
+}
