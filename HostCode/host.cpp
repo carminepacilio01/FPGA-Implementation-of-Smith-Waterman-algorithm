@@ -1,12 +1,4 @@
 #include "host.h"
-#include <random>
-#include <time.h>
-
-#include "common/xcl2.hpp"
-
-#define MAX_SEQ_LEN 1000
-
-#define NUM_KERNEL 1
 
 #define MAX_HBM_BANKCOUNT 32
 #define BANK_NAME(n) n | XCL_MEM_TOPOLOGY
@@ -19,95 +11,54 @@ const int bank[MAX_HBM_BANKCOUNT] = {
     BANK_NAME(25), BANK_NAME(26), BANK_NAME(27), BANK_NAME(28), BANK_NAME(29),
     BANK_NAME(30), BANK_NAME(31)};
 
-void printConf(char *seqA, char *seqB, int ws, int wd, int gap_opening, int enlargement);
-void fprintMatrix(int *P, int *D, int *Q, int lenA, int lenB);
-int compute_golden(int lenA, char *seqA, int lenB, char *seqB, int wd, int ws, int gap_opening, int enlargement);
-void random_seq_gen(int lenA, char *seqA, int lenB, char *seqB);
+void printConf(char *target, char *database, int ws, int wd, int gap_opening, int enlargement);
+int compute_golden(int lenT, char *target, int lenD, char *database, int wd, int ws, int gap_opening, int enlargement);
+void random_seq_gen(int lenT, char *target, int lenD, char *database);
 int gen_rnd(int min, int max);
 
 int main(int argc, char* argv[]){
-	
-	//TARGET_DEVICE macro needs to be passed from gcc command line
-	// if(argc != 3) {
-	// 	std::cout << "Usage: " << argv[0] <<" <xclbin> <dataset path>" << std::endl;
-	// 	return EXIT_FAILURE;
-	// }
-
-    // FILE* f = fopen(argv[2], "r");
 
     if(argc < 2) {
 		std::cout << "Usage: " << argv[0] <<" <xclbin>" << std::endl;
 		return EXIT_FAILURE;
 	}
-    
-    // double frequency = 350000000;
 
     srandom(2);
-	// clock_t start, end;
 
-	//	match score
-	const int wd = 1;
-	//	mismatch score
-	const int ws = -1;
+	const int wd 			=  1; 	// match score
+	const int ws 			= -1;	// mismatch score
+	const int gap_opening	= -3;
+	const int enlargement 	= -1;
 
-	const int gap_opening = -3;
-	const int enlargement = -1;
+	//////Input buffers
+	int lenT[INPUT_SIZE];
+	int lenD[INPUT_SIZE];
+	char target[INPUT_SIZE][MAX_SEQ_LEN];
+	char database[INPUT_SIZE][MAX_SEQ_LEN];
 
-	const int n = INPUT_SIZE;
-	int lenA[INPUT_SIZE];
-	int lenB[INPUT_SIZE];
-	char seqA[INPUT_SIZE][MAX_DIM];
-	char seqB[INPUT_SIZE][MAX_DIM];
-
-	for(int i = 0; i < n; i++){
-
-		//	generate random sequences
-		//	length of the sequences
-		lenA[i] = (int)  gen_rnd(MAX_SEQ_LEN - 10, MAX_SEQ_LEN - 2);
-		lenB[i] = (int)  gen_rnd(MAX_SEQ_LEN - 10, MAX_SEQ_LEN - 2);
-
-		lenA[i] += 1;
-		lenB[i] += 1;
-
-		//	sequences
-		//seqA[i] = (char *) malloc(sizeof(char) * (lenA[i]));
-		//seqB[i] = (char *) malloc(sizeof(char) * (lenB[i]));
-
-		//	generate rand sequences
-		seqA[i][0] = seqB[i][0] = '-';
-		seqA[i][lenA[i]] = seqB[i][lenA[i]] = '\0';
-		random_seq_gen(lenA[i], seqA[i], lenB[i], seqB[i]);
-
-		//	Printing current configuration
-	}
-
+	//////Buffers to store results of computations
     int score[INPUT_SIZE];
 	int golden_score[INPUT_SIZE];
-	int n_ops = 0;
 
-	double mean_golden_time = 0;
-	double mean_golden_gcup = 0;
+	for(int i = 0; i < INPUT_SIZE; i++){
 
-	for (int golden_rep = 0; golden_rep < n; golden_rep++) {
+		//	generate random length of the sequences
+		lenT[i] = (int)  gen_rnd(MAX_SEQ_LEN - 10, MAX_SEQ_LEN - 2);
+		lenD[i] = (int)  gen_rnd(MAX_SEQ_LEN - 10, MAX_SEQ_LEN - 2);
 
-		auto start = clock();
-		golden_score[golden_rep] = compute_golden(lenA[golden_rep], seqA[golden_rep], lenB[golden_rep], seqB[golden_rep], wd, ws, gap_opening, enlargement);
-		auto end = clock();
+		lenT[i] += 1;
+		lenD[i] += 1
 
-		n_ops = lenA[golden_rep]*lenB[golden_rep];
-		double cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-		double gcup = (double) (n_ops / cpu_time_used )  * 1e-9;
+		//	generate rand sequences
+		target[i][0] = database[i][0] = '-';
+		target[i][lenT[i]] = database[i][lenT[i]] = '\0';
+		random_seq_gen(lenT[i], target[i], lenD[i], database[i]);
 
-		mean_golden_time += cpu_time_used;
-		mean_golden_gcup += gcup;
+		//	Printing current configuration
+		printConf(target, database, ws, wd, gap_opening, enlargement);
 	}
-	
 
-/*
-================================================================================================================================
-	OPENCL STUFF
-================================================================================================================================
-*/
+/////////////////////////		OPENCL CONFIGURATION 		////////////////////////////////////
 
    	std::string binaryFile = argv[1]; // prendo il bitstream 
     auto fileBuf = xcl::read_binary_file(binaryFile); // leggi bitstream
@@ -143,6 +94,7 @@ int main(int argc, char* argv[]){
         exit(EXIT_FAILURE);
     }
 
+	////Mapping buffers onto HBM
     cl_mem_ext_ptr_t lenT_buffer_ext;
     cl_mem_ext_ptr_t target_buffer_ext;
     cl_mem_ext_ptr_t lenD_buffer_ext;
@@ -161,24 +113,21 @@ int main(int argc, char* argv[]){
     database_buffer_ext.flags = bank[3];
     score_buffer_ext.flags = bank[4];
 
-    lenT_buffer_ext.obj = lenA;
-    target_buffer_ext.obj = seqA;
-    lenD_buffer_ext.obj = lenB;
-    database_buffer_ext.obj = seqB;
+    lenT_buffer_ext.obj = lenT;
+    target_buffer_ext.obj = target;
+    lenD_buffer_ext.obj = lenD;
+    database_buffer_ext.obj = database;
     score_buffer_ext.obj = score;
 
     cl::Buffer lenT_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, INPUT_SIZE * sizeof(int), &lenT_buffer_ext);
-    cl::Buffer target_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, INPUT_SIZE * MAX_DIM * sizeof(char), &target_buffer_ext);
+    cl::Buffer target_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, INPUT_SIZE * MAX_SEQ_LEN * sizeof(char), &target_buffer_ext);
     cl::Buffer lenD_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, INPUT_SIZE * sizeof(int), &lenD_buffer_ext);
-    cl::Buffer database_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, INPUT_SIZE * MAX_DIM * sizeof(char), &database_buffer_ext);
+    cl::Buffer database_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, INPUT_SIZE * MAX_SEQ_LEN * sizeof(char), &database_buffer_ext);
     cl::Buffer score_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_WRITE_ONLY, INPUT_SIZE * sizeof(int), &score_buffer_ext);
 
     q.finish();
-/*
-================================================================================================================================
-	MY STUFF
-================================================================================================================================
-*/
+
+/////////////////////////		KERNEL EXCECUTION 		////////////////////////////////////
 
 	OCL_CHECK(err, err = sw_maxi.setArg(0, lenT_buffer));
 	OCL_CHECK(err, err = sw_maxi.setArg(1, target_buffer));
@@ -189,12 +138,14 @@ int main(int argc, char* argv[]){
     OCL_CHECK(err, err = sw_maxi.setArg(6, gap_opening));
     OCL_CHECK(err, err = sw_maxi.setArg(7, enlargement));
     OCL_CHECK(err, err = sw_maxi.setArg(8, score_buffer));
+	OCL_CHECK(err, err = sw_maxi.setArg(9, INPUT_SIZE));
 
     // Data will be migrated to kernel space
     OCL_CHECK(err, q.enqueueMigrateMemObjects({lenT_buffer, target_buffer, lenD_buffer, database_buffer}, 0)); /*0 means from host*/
 	OCL_CHECK(err, q.finish());
 
 	auto start = std::chrono::high_resolution_clock::now();
+
 	//Launch the Kernel
 	q.enqueueTask(sw_maxi);
 	OCL_CHECK(err, q.finish());
@@ -202,24 +153,43 @@ int main(int argc, char* argv[]){
 	auto stop = std::chrono::high_resolution_clock::now();
 
     auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
+	float gcup = (double) (MAX_SEQ_LEN * MAX_SEQ_LEN / duration ) * 1e-9;
 
-    printf("Operation concluded in %f nanoseconds\n", (float)duration.count());
-	
+
+    printf("Code excecuted on FPGA kernel in %f ns \n", (float)duration.count());
+	printf("GCUPS: %f \n",gcup);
 	
 	//Data from Kernel to Host
 	q.enqueueMigrateMemObjects({score_buffer}, CL_MIGRATE_MEM_OBJECT_HOST);
 	q.finish();
+
+/////////////////////////			TESTBENCH			////////////////////////////////////
+
+	double mean_golden_time = 0;
+	double mean_golden_gcup = 0;
+
+	auto start = std::chrono::high_resolution_clock::now();
+
+	for (int golden_rep = 0; golden_rep < n; golden_rep++) {
+
+		auto start = clock();
+		golden_score[golden_rep] = compute_golden(lenT[golden_rep], target[golden_rep], lenD[golden_rep], database[golden_rep], wd, ws, gap_opening, enlargement);
+		auto end = clock();
+	}
+
+	auto stop = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
 	
-	
+	printf("Code excecuted on HOST in %f ns \n", (float)duration.count());
 
 	return 0;
 }
 
 //	Prints the current configuration
-void printConf(char *seqA, char *seqB, int ws, int wd, int gap_opening, int enlargement) {
+void printConf(char *target, char *database, int ws, int wd, int gap_opening, int enlargement) {
 	std::cout << std::endl << "+++++++++++++++++++++" << std::endl;
-	std::cout << "+ Sequence A: [" << strlen(seqA) << "]: " << seqA << std::endl;
-	std::cout << "+ Sequence B: [" << strlen(seqB) << "]: " << seqB << std::endl;
+	std::cout << "+ Sequence A: [" << strlen(target) << "]: " << target << std::endl;
+	std::cout << "+ Sequence B: [" << strlen(database) << "]: " << database << std::endl;
 	std::cout << "+ Match Score: " << wd << std::endl;
 	std::cout << "+ Mismatch Score: " << ws << std::endl;
 	std::cout << "+ Gap Opening: " << gap_opening << std::endl;
@@ -232,35 +202,35 @@ int gen_rnd(int min, int max) {
     return (int) min + rand() % (max - min + 1);
 }
 
-void random_seq_gen(int lenA, char *seqA, int lenB, char *seqB) {
+void random_seq_gen(int lenT, char *target, int lenD, char *database) {
 
 	int i; 
-	for(i = 1; i < lenA; i++){
+	for(i = 1; i < lenT; i++){
 		int tmp_gen = gen_rnd(0, 3);
-		seqA[i] = (tmp_gen == 0) ? 'A' :
+		target[i] = (tmp_gen == 0) ? 'A' :
 				  (tmp_gen == 1) ? 'C' :
 			      (tmp_gen == 2) ? 'G' : 'T';
 	}
 
-	for(i = 1; i < lenB; i++){
+	for(i = 1; i < lenD; i++){
 		int tmp_gen = gen_rnd(0, 3);
-		seqB[i] = (tmp_gen == 0) ? 'A' :
+		database[i] = (tmp_gen == 0) ? 'A' :
 				  (tmp_gen == 1) ? 'C' :
 				  (tmp_gen == 2) ? 'G' : 'T';
 	}
 }
 
-int compute_golden(int lenA, char *seqA, int lenB, char *seqB, int wd, int ws, int gap_opening, int enlargement) {
+int compute_golden(int lenT, char *target, int lenD, char *database, int wd, int ws, int gap_opening, int enlargement) {
 	// Inizializza le matrici D, P, Q
-	    std::vector< std::vector<int> > D(lenA, std::vector<int>(lenB, 0));
-	    std::vector< std::vector<int> > P(lenA, std::vector<int>(lenB, std::numeric_limits<int>::min() / 2));
-	    std::vector< std::vector<int> > Q(lenA, std::vector<int>(lenB, std::numeric_limits<int>::min() / 2));
+	    std::vector< std::vector<int> > D(lenT, std::vector<int>(lenD, 0));
+	    std::vector< std::vector<int> > P(lenT, std::vector<int>(lenD, std::numeric_limits<int>::min() / 2));
+	    std::vector< std::vector<int> > Q(lenT, std::vector<int>(lenD, std::numeric_limits<int>::min() / 2));
 
 	    int gap_penalty = gap_opening + enlargement * 1;
 	    int max_score = 0;
 
-	    for (int i = 1; i < lenA; ++i) {
-	        for (int j = 1; j < lenB; ++j) {
+	    for (int i = 1; i < lenT; ++i) {
+	        for (int j = 1; j < lenD; ++j) {
 	            // Calcola P[i][j]
 	            P[i][j] = std::max(P[i-1][j] + enlargement, D[i-1][j] + gap_penalty);
 
@@ -268,7 +238,7 @@ int compute_golden(int lenA, char *seqA, int lenB, char *seqB, int wd, int ws, i
 	            Q[i][j] = std::max(Q[i][j-1] + enlargement, D[i][j-1] + gap_penalty);
 
 	            // Calcola D[i][j]
-	            int match = (seqA[i] == seqB[j]) ? wd : ws;
+	            int match = (target[i] == database[j]) ? wd : ws;
 	            D[i][j] = std::max(0, D[i-1][j-1] + match);
 	            D[i][j] = std::max(D[i][j], P[i][j]);
 	            D[i][j] = std::max(D[i][j], Q[i][j]);
