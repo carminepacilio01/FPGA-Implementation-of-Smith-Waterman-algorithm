@@ -47,7 +47,7 @@ int main(int argc, char* argv[]){
 		lenD[i] = (int)  gen_rnd(MAX_SEQ_LEN - 10, MAX_SEQ_LEN - 2);
 
 		lenT[i] += 1;
-		lenD[i] += 1
+		lenD[i] += 1;
 
 		//	generate rand sequences
 		target[i][0] = database[i][0] = '-';
@@ -55,7 +55,7 @@ int main(int argc, char* argv[]){
 		random_seq_gen(lenT[i], target[i], lenD[i], database[i]);
 
 		//	Printing current configuration
-		printConf(target, database, ws, wd, gap_opening, enlargement);
+		printConf(target[i], database[i], ws, wd, gap_opening, enlargement);
 	}
 
 /////////////////////////		OPENCL CONFIGURATION 		////////////////////////////////////
@@ -153,7 +153,7 @@ int main(int argc, char* argv[]){
 	auto stop = std::chrono::high_resolution_clock::now();
 
     auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
-	float gcup = (double) (MAX_SEQ_LEN * MAX_SEQ_LEN / duration ) * 1e-9;
+	float gcup = (double) (MAX_SEQ_LEN * MAX_SEQ_LEN / (float)duration.count() ) * 1e-9;
 
 
     printf("Code excecuted on FPGA kernel in %f ns \n", (float)duration.count());
@@ -168,17 +168,17 @@ int main(int argc, char* argv[]){
 	double mean_golden_time = 0;
 	double mean_golden_gcup = 0;
 
-	auto start = std::chrono::high_resolution_clock::now();
+	start = std::chrono::high_resolution_clock::now();
 
-	for (int golden_rep = 0; golden_rep < n; golden_rep++) {
+	for (int golden_rep = 0; golden_rep < INPUT_SIZE; golden_rep++) {
 
 		auto start = clock();
 		golden_score[golden_rep] = compute_golden(lenT[golden_rep], target[golden_rep], lenD[golden_rep], database[golden_rep], wd, ws, gap_opening, enlargement);
 		auto end = clock();
 	}
 
-	auto stop = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
+	stop = std::chrono::high_resolution_clock::now();
+	duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
 	
 	printf("Code excecuted on HOST in %f ns \n", (float)duration.count());
 
