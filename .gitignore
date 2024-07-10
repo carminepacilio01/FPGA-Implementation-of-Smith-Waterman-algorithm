@@ -41,3 +41,6 @@ _x.sw_emu.xilinx_u55c_gen3x16_xdma_3_202210_1
 build_dir.sw_emu.xilinx_u55c_gen3x16_xdma_3_202210_1
 computeSW
 sw_maxi
+xrt.run_summary
+.run/2043968/sw_emu/device0/binary_0/dltmp
+.run/2043968/sw_emu/device0/binary_0/xmltmp
