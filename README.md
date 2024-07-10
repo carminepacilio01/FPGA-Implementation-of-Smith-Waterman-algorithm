@@ -1,1 +1,1 @@
-Accelerated Smith-Waterman algorithm on FPGA
+# Accelerated Smith-Waterman algorithm on FPGA
