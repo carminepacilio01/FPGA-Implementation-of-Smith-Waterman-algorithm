@@ -154,7 +154,7 @@ void writeOutput(int score_l[INPUT_SIZE], int score[INPUT_SIZE]){
 }
 
 //////////////////MASTER AXI
-void sw_maxi(int lenT[INPUT_SIZE], char target[INPUT_SIZE][MAX_DIM], int lenD[INPUT_SIZE], char database[INPUT_SIZE][MAX_DIM], int wd, int ws, int gap_opening, int enlargement, int score[INPUT_SIZE]) {
+void sw_maxi(int lenT[INPUT_SIZE], char target[INPUT_SIZE][MAX_DIM], int lenD[INPUT_SIZE], char database[INPUT_SIZE][MAX_DIM], int wd, int ws, int gap_opening, int enlargement, int score[INPUT_SIZE], int input_len) {
 
 #pragma HLS INTERFACE s_axilite port=return bundle=control
 
@@ -173,6 +173,7 @@ void sw_maxi(int lenT[INPUT_SIZE], char target[INPUT_SIZE][MAX_DIM], int lenD[IN
 #pragma HLS INTERFACE s_axilite port=gap_opening bundle=control
 #pragma HLS INTERFACE s_axilite port=enlargement bundle=control
 #pragma HLS INTERFACE s_axilite port=score bundle=control
+#pragma HLS INTERFACE s_axilite port=input_len bundle=control
 
 //	Defining configuration for scoring
 	conf_t local_conf;
@@ -199,7 +200,7 @@ void sw_maxi(int lenT[INPUT_SIZE], char target[INPUT_SIZE][MAX_DIM], int lenD[IN
 
 	readInput(lenT, lenT_local, target, t_local, lenD, lenD_local, database, db_local);
 
-    compute_SW_loop: for (int i = 0; i < INPUT_SIZE; i++) {
+    compute_SW_loop: for (int i = 0; i < input_len; i++) {
 #pragma HLS PIPELINE  II=1
 
        computeSW(lenT_local[i], t_local[i], lenD_local[i], db_local[i], local_conf, &score_l[i]);
