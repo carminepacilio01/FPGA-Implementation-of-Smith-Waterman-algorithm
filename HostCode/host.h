@@ -11,7 +11,7 @@
 #include "common/xcl2.hpp"
 
 #define MAX_DIM 102
-#define MAX_SEQ_LEN 10
+#define MAX_SEQ_LEN 30
 #define INPUT_SIZE 200
 
 #define NUM_KERNEL 1

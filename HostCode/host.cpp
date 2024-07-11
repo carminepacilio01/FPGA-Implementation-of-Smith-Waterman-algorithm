@@ -9,7 +9,9 @@ const int bank[MAX_HBM_BANKCOUNT] = {
     BANK_NAME(15), BANK_NAME(16), BANK_NAME(17), BANK_NAME(18), BANK_NAME(19),
     BANK_NAME(20), BANK_NAME(21), BANK_NAME(22), BANK_NAME(23), BANK_NAME(24),
     BANK_NAME(25), BANK_NAME(26), BANK_NAME(27), BANK_NAME(28), BANK_NAME(29),
-    BANK_NAME(30), BANK_NAME(31)};
+    BANK_NAME(30), BANK_NAME(31)
+};
+
 
 void printConf(char *target, char *database, int ws, int wd, int gap_opening, int enlargement);
 int compute_golden(int lenT, char *target, int lenD, char *database, int wd, int ws, int gap_opening, int enlargement);
@@ -30,25 +32,29 @@ int main(int argc, char* argv[]){
 	const int gap_opening	= -3;
 	const int enlargement 	= -1;
 
+    cl_int 				err;
+    cl::Context 		context;
+    cl::Kernel 			sw_maxi;
+    cl::CommandQueue 	q;
 
-    cl_int err;
-    cl::Context context;
-    cl::Kernel sw_maxi;
+	std::vector< int, aligned_allocator<int> > 		lenT(INPUT_SIZE);
+	// std::vector< char, aligned_allocator<char> > 	target(INPUT_SIZE * MAX_DIM);
+    std::vector< int, aligned_allocator<int> > 		lenD(INPUT_SIZE);
+	// std::vector< char, aligned_allocator<char> > 	database(INPUT_SIZE * MAX_DIM);
+    std::vector< int, aligned_allocator<int> > 		score(INPUT_SIZE);
 
-    cl::CommandQueue q;
-	std::vector< int, aligned_allocator<int> > lenT(INPUT_SIZE);
-    std::vector< char, aligned_allocator<char> > target(INPUT_SIZE * MAX_DIM);
-    std::vector< int, aligned_allocator<int> > lenD(INPUT_SIZE);
-	std::vector< char, aligned_allocator<char> > database(INPUT_SIZE * MAX_DIM);
-    std::vector< int, aligned_allocator<int> > score(INPUT_SIZE);
+	char target[INPUT_SIZE][MAX_DIM];
+	char database[INPUT_SIZE][MAX_DIM];
 
 /////////////////////////		DATASET GENERATION 		////////////////////////////////////
 
-	printf("Generating %d random sequences pairs. \n", INPUT_SIZE);
+	printf("Generating %d random sequence pairs. \n", INPUT_SIZE);
 	///////Generation of random sequences
-	for(int i = 0; i < INPUT_SIZE; i++){
+	// Generation of random sequences
+    for(int i = 0; i < INPUT_SIZE; i++){
 
-		//	generate random length of the sequences
+		//	generate random sequences
+		//	length of the sequences
 		lenT[i] = (int)  gen_rnd(MAX_SEQ_LEN - 10, MAX_SEQ_LEN - 2);
 		lenD[i] = (int)  gen_rnd(MAX_SEQ_LEN - 10, MAX_SEQ_LEN - 2);
 
@@ -57,7 +63,7 @@ int main(int argc, char* argv[]){
 
 		//	generate rand sequences
 		target[i][0] = database[i][0] = '-';
-		target[i][lenT[i]] = database[i][lenT[i]] = '\0';
+		target[i][lenT[i]] = database[i][lenD[i]] = '\0';
 		random_seq_gen(lenT[i], target[i], lenD[i], database[i]);
 	}
 
@@ -113,7 +119,7 @@ int main(int argc, char* argv[]){
         lenT_buffer_ext[i].param = 0;
         lenT_buffer_ext[i].flags = bank[i*5];
 
-        target_buffer_ext[i].obj = target.data();
+        target_buffer_ext[i].obj = target;
         target_buffer_ext[i].param = 0;
         target_buffer_ext[i].flags = bank[i*5+1];
         
@@ -121,7 +127,7 @@ int main(int argc, char* argv[]){
         lenD_buffer_ext[i].param = 0;
         lenD_buffer_ext[i].flags = bank[i*5+2];
 
-        database_buffer_ext[i].obj = database.data();
+        database_buffer_ext[i].obj = database;
         database_buffer_ext[i].param = 0;
         database_buffer_ext[i].flags = bank[i*5+3];
 
@@ -153,7 +159,7 @@ int main(int argc, char* argv[]){
 	printf("Copying input sequences on the FPGA. \n");
     // Data will be migrated to kernel space
 	for(int i = 0; i < NUM_KERNEL; i++)
-        err = commands.enqueueMigrateMemObjects({lenT_buffer[i], target_buffer[i], lenD_buffer[i], database_buffer[i]}, 0); /*0 means from host*/
+        err = q.enqueueMigrateMemObjects({lenT_buffer[i], target_buffer[i], lenD_buffer[i], database_buffer[i]}, 0); /*0 means from host*/
 
     if (err != CL_SUCCESS) {
             printf("Error: Failed to write to device memory!\n");
@@ -192,7 +198,7 @@ int main(int argc, char* argv[]){
 
 	//Launch the Kernels
 	for (int i = 0; i < NUM_KERNEL; ++i)
-        err |= commands.enqueueTask(sw_maxi);
+        err |= q.enqueueTask(sw_maxi);
 
 
     if (err) {
@@ -206,11 +212,11 @@ int main(int argc, char* argv[]){
 	auto stop = std::chrono::high_resolution_clock::now();
 
     auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
-	float gcup = (double) (MAX_SEQ_LEN * MAX_SEQ_LEN / (float)duration.count() ) * 1e-9;
+	float gcup = (double) (MAX_DIM * MAX_DIM * 20000 / (float)duration.count());
 	
 	//Data from Kernel to Host
 	for (int i = 0; i < NUM_KERNEL; ++i) {
-        err = commands.enqueueMigrateMemObjects({score_buffer[i]}, CL_MIGRATE_MEM_OBJECT_HOST);  
+        err = q.enqueueMigrateMemObjects({score_buffer[i]}, CL_MIGRATE_MEM_OBJECT_HOST);  
     }
 
 
@@ -223,7 +229,7 @@ int main(int argc, char* argv[]){
 	q.finish();
 
 	printf("Finished FPGA excecution. \n");
-    printf("FPGA Kernel executed in %f ns \n", (float)duration.count());
+    printf("FPGA Kernel executed in %f ms \n", (float)duration.count() * 1e-6);
 	printf("GCUPS: %f \n",gcup);
 
 /////////////////////////			TESTBENCH			////////////////////////////////////
@@ -239,14 +245,15 @@ int main(int argc, char* argv[]){
 	stop = std::chrono::high_resolution_clock::now();
 	duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
 	
-	printf("Software version executed in %f ns \n", (float)duration.count());
+	printf("Software version executed in %f ns \n", (float)duration.count() * 1e-6);
 
 	////////test bench results
 	printf("Comparing results. \n");
-	for (int i=0; i<num; i++){
-		if (scores[i]!=golden_scores[i]){
+	bool test_score=true;
+	for (int i=0; i < INPUT_SIZE; i++){
+		if (score[i]!=golden_score[i]){
 			printConf(target[i], database[i], ws, wd, gap_opening, enlargement);
-            printf("HW: %d, SW: %d\n", scores[i], goleden_scores[i]);
+            printf("HW: %d, SW: %d\n", score[i], golden_score[i]);
             test_score=false;
         }
 	}
@@ -280,19 +287,16 @@ int gen_rnd(int min, int max) {
 
 void random_seq_gen(int lenT, char *target, int lenD, char *database) {
 
-	int i; 
+	char alphabet[4] = {'A', 'C', 'G', 'T'};
+	int i;
 	for(i = 1; i < lenT; i++){
 		int tmp_gen = gen_rnd(0, 3);
-		target[i] = (tmp_gen == 0) ? 'A' :
-				  (tmp_gen == 1) ? 'C' :
-			      (tmp_gen == 2) ? 'G' : 'T';
+		target[i] = alphabet[tmp_gen];
 	}
 
 	for(i = 1; i < lenD; i++){
 		int tmp_gen = gen_rnd(0, 3);
-		database[i] = (tmp_gen == 0) ? 'A' :
-				  (tmp_gen == 1) ? 'C' :
-				  (tmp_gen == 2) ? 'G' : 'T';
+		database[i] = alphabet[tmp_gen];
 	}
 }
 
