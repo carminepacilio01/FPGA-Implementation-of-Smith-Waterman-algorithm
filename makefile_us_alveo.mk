@@ -62,7 +62,7 @@ EXECUTABLE = ./$(KERNEL_NAME)
 EMCONFIG_DIR = $(TEMP_DIR)
 
 VPP_CFLAGS += --hls.clock $(HLS_HZ):$(KERNEL_FUNCTION)
-#VPP_FLAGS += --config sw_maxi.ini
+
 
 VPP_LDFLAGS += --kernel_frequency $(FREQ_MHZ)
 
