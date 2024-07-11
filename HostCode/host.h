@@ -12,8 +12,8 @@
 
 #define SEED 2
 
-//////THE MAX_DIM ON THE FPGA BUILD IS 1024
-#define MAX_SEQ_LEN 256
+#define MAX_DIM 102
+#define MAX_SEQ_LEN 10
 #define INPUT_SIZE 200
 
 #define NUM_KERNEL 1
