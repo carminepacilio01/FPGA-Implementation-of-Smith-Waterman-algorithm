@@ -77,3 +77,5 @@ _x/package/package.steps.log
 _x/package/packagedSystemDiagram.json
 _x/reports/package/v++_package_sw_maxi_guidance.html
 emconfig.json
+.run
+_x.hw_emu.xilinx_u55c_gen3x16_xdma_3_202210_1/sw_maxi.xo.compile_summary
