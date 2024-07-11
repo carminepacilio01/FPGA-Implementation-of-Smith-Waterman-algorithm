@@ -42,7 +42,6 @@ VPP_CFLAGS :=
 CMD_ARGS = $(BUILD_DIR)/$(KERNEL_NAME).xclbin
 CXXFLAGS += -I$(XILINX_XRT)/include -I$(XILINX_VIVADO)/include -Wall -O0 -g -std=c++1y
 LDFLAGS += -L$(XILINX_XRT)/lib -pthread -lOpenCL
-LDLFLAGS += --config sw_maxi.ini
 
 ########################## Checking if PLATFORM in allowlist #######################
 PLATFORM_BLOCKLIST += nodma 
@@ -63,6 +62,7 @@ EXECUTABLE = ./$(KERNEL_NAME)
 EMCONFIG_DIR = $(TEMP_DIR)
 
 VPP_CFLAGS += --hls.clock $(HLS_HZ):$(KERNEL_FUNCTION)
+#VPP_FLAGS += --config sw_maxi.ini
 
 VPP_LDFLAGS += --kernel_frequency $(FREQ_MHZ)
 
@@ -88,15 +88,6 @@ $(BUILD_DIR)/$(KERNEL_NAME).xclbin: $(TEMP_DIR)/$(KERNEL_NAME).xo
 	mkdir -p $(BUILD_DIR)
 	v++ -l $(VPP_FLAGS) $(VPP_LDFLAGS) -t $(TARGET) --platform $(PLATFORM) --temp_dir $(TEMP_DIR) -o'$(LINK_OUTPUT)' $(+)
 	v++ -p $(LINK_OUTPUT) $(VPP_FLAGS) -t $(TARGET) --platform $(PLATFORM) --package.out_dir $(PACKAGE_OUT) -o $(BUILD_DIR)/$(KERNEL_NAME).xclbin
-
-##########################################
-#FOR TESTING MAKEFILE VARIABLES ONLY
-#REMEMBER TO DELETE ME
-##########################################
-testVARS:
-	@echo v++ -c $(VPP_FLAGS) $(VPP_CFLAGS) -t $(TARGET) --platform $(PLATFORM) -k sw_maxi --temp_dir $(TEMP_DIR)  -I'$(<D)' -o'$@' $(KERN_SRCS)
-	@echo v++ -l $(VPP_FLAGS) $(VPP_LDFLAGS) -t $(TARGET) --platform $(PLATFORM) --temp_dir $(TEMP_DIR) -o'$(LINK_OUTPUT)' $(+)
-	@echo v++ -p $(LINK_OUTPUT) $(VPP_FLAGS) -t $(TARGET) --platform $(PLATFORM) --package.out_dir $(PACKAGE_OUT) -o $(BUILD_DIR)/$(KERNEL_NAME).xclbin
 
 ############################## Setting Rules for Host (Building Host Executable) ##############################
 $(EXECUTABLE): $(HOST_SRCS) | check-xrt
