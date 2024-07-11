@@ -154,58 +154,60 @@ void writeOutput(int score_l[INPUT_SIZE], int score[INPUT_SIZE]){
 }
 
 //////////////////MASTER AXI
-void sw_maxi(int lenT[INPUT_SIZE], char target[INPUT_SIZE][MAX_DIM], int lenD[INPUT_SIZE], char database[INPUT_SIZE][MAX_DIM], int wd, int ws, int gap_opening, int enlargement, int score[INPUT_SIZE], int input_len) {
+extern "C" {
+    void sw_maxi(int lenT[INPUT_SIZE], char target[INPUT_SIZE][MAX_DIM], int lenD[INPUT_SIZE], char database[INPUT_SIZE][MAX_DIM], int wd, int ws, int gap_opening, int enlargement, int score[INPUT_SIZE], int input_len) {
 
-#pragma HLS INTERFACE s_axilite port=return bundle=control
+    #pragma HLS INTERFACE s_axilite port=return bundle=control
 
-#pragma HLS INTERFACE m_axi port=lenT bundle=gmem depth=INPUT_SIZE offset=slave
-#pragma HLS INTERFACE m_axi port=target bundle=gmem depth=INPUT_SIZE*MAX_DIM offset=slave
-#pragma HLS INTERFACE m_axi port=lenD bundle=gmem depth=INPUT_SIZE offset=slave
-#pragma HLS INTERFACE m_axi port=database bundle=gmem depth=INPUT_SIZE*MAX_DIM offset=slave
-#pragma HLS INTERFACE m_axi port=score bundle=gmem depth=INPUT_SIZE offset=slave
+    #pragma HLS INTERFACE m_axi port=lenT bundle=gmem depth=INPUT_SIZE offset=slave
+    #pragma HLS INTERFACE m_axi port=target bundle=gmem depth=INPUT_SIZE*MAX_DIM offset=slave
+    #pragma HLS INTERFACE m_axi port=lenD bundle=gmem depth=INPUT_SIZE offset=slave
+    #pragma HLS INTERFACE m_axi port=database bundle=gmem depth=INPUT_SIZE*MAX_DIM offset=slave
+    #pragma HLS INTERFACE m_axi port=score bundle=gmem depth=INPUT_SIZE offset=slave
 
-#pragma HLS INTERFACE s_axilite port=lenT bundle=control
-#pragma HLS INTERFACE s_axilite port=target bundle=control
-#pragma HLS INTERFACE s_axilite port=lenD bundle=control
-#pragma HLS INTERFACE s_axilite port=database bundle=control
-#pragma HLS INTERFACE s_axilite port=wd bundle=control
-#pragma HLS INTERFACE s_axilite port=ws bundle=control
-#pragma HLS INTERFACE s_axilite port=gap_opening bundle=control
-#pragma HLS INTERFACE s_axilite port=enlargement bundle=control
-#pragma HLS INTERFACE s_axilite port=score bundle=control
-#pragma HLS INTERFACE s_axilite port=input_len bundle=control
+    #pragma HLS INTERFACE s_axilite port=lenT bundle=control
+    #pragma HLS INTERFACE s_axilite port=target bundle=control
+    #pragma HLS INTERFACE s_axilite port=lenD bundle=control
+    #pragma HLS INTERFACE s_axilite port=database bundle=control
+    #pragma HLS INTERFACE s_axilite port=wd bundle=control
+    #pragma HLS INTERFACE s_axilite port=ws bundle=control
+    #pragma HLS INTERFACE s_axilite port=gap_opening bundle=control
+    #pragma HLS INTERFACE s_axilite port=enlargement bundle=control
+    #pragma HLS INTERFACE s_axilite port=score bundle=control
+    #pragma HLS INTERFACE s_axilite port=input_len bundle=control
 
-//	Defining configuration for scoring
-	conf_t local_conf;
-	local_conf.match 			= wd;
-	local_conf.mismatch			= ws;
-	local_conf.gap_opening		= gap_opening + enlargement;
-	local_conf.gap_extension	= enlargement;
+    //	Defining configuration for scoring
+        conf_t local_conf;
+        local_conf.match 			= wd;
+        local_conf.mismatch			= ws;
+        local_conf.gap_opening		= gap_opening + enlargement;
+        local_conf.gap_extension	= enlargement;
 
-	int lenT_local[INPUT_SIZE];
-#pragma HLS ARRAY_PARTITION variable=lenT_local type=complete dim=1
-	char t_local[INPUT_SIZE][MAX_DIM];
-#pragma HLS ARRAY_PARTITION variable=t_local block factor=2 dim=1
-	int lenD_local[INPUT_SIZE];
-#pragma HLS ARRAY_PARTITION variable=lenD_local type=complete dim=1
-	char db_local[INPUT_SIZE][MAX_DIM];
-#pragma HLS ARRAY_PARTITION variable=db_local block factor=2 dim=1
-	int score_l[INPUT_SIZE];
-#pragma HLS ARRAY_PARTITION variable=score_l type=complete dim=1
-
-
+        int lenT_local[INPUT_SIZE];
+    #pragma HLS ARRAY_PARTITION variable=lenT_local type=complete dim=1
+        char t_local[INPUT_SIZE][MAX_DIM];
+    #pragma HLS ARRAY_PARTITION variable=t_local block factor=2 dim=1
+        int lenD_local[INPUT_SIZE];
+    #pragma HLS ARRAY_PARTITION variable=lenD_local type=complete dim=1
+        char db_local[INPUT_SIZE][MAX_DIM];
+    #pragma HLS ARRAY_PARTITION variable=db_local block factor=2 dim=1
+        int score_l[INPUT_SIZE];
+    #pragma HLS ARRAY_PARTITION variable=score_l type=complete dim=1
 
 
-#pragma HLS DATAFLOW
 
-	readInput(lenT, lenT_local, target, t_local, lenD, lenD_local, database, db_local);
 
-    compute_SW_loop: for (int i = 0; i < input_len; i++) {
-#pragma HLS PIPELINE  II=1
+    #pragma HLS DATAFLOW
 
-       computeSW(lenT_local[i], t_local[i], lenD_local[i], db_local[i], local_conf, &score_l[i]);
+        readInput(lenT, lenT_local, target, t_local, lenD, lenD_local, database, db_local);
+
+        compute_SW_loop: for (int i = 0; i < input_len; i++) {
+    #pragma HLS PIPELINE  II=1
+
+        computeSW(lenT_local[i], t_local[i], lenD_local[i], db_local[i], local_conf, &score_l[i]);
+        }
+
+        writeOutput(score_l, score);
     }
-
-    writeOutput(score_l, score);
 }
 
