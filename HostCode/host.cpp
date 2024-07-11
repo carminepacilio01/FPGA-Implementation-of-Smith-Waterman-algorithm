@@ -31,9 +31,11 @@ int main(int argc, char* argv[]){
 	char target[INPUT_SIZE][MAX_DIM];
 	char database[INPUT_SIZE][MAX_DIM];
 
+	int cell_number;
+
 /////////////////////////		DATASET GENERATION 		////////////////////////////////////
 
-	printf("Generating %d random sequence pairs. \n", INPUT_SIZE);
+	std::cout << "Generating "<< INPUT_SIZE << " random sequence pairs." << std::endl;
 	///////Generation of random sequences
 	// Generation of random sequences
     for(int i = 0; i < INPUT_SIZE; i++){
@@ -50,11 +52,13 @@ int main(int argc, char* argv[]){
 		target[i][0] = database[i][0] = '-';
 		target[i][lenT[i]] = database[i][lenD[i]] = '\0';
 		random_seq_gen(lenT[i], target[i], lenD[i], database[i]);
+
+		cell_number += lenD[i] * lenT[i];
 	}
 
 /////////////////////////		OPENCL CONFIGURATION 		////////////////////////////////////
 
-	printf("Programmin FPGA Device. \n");
+	std::cout << "Programmin FPGA Device. " << std::endl;;
 
    	std::string binaryFile = argv[1]; // prendo il bitstream 
     auto fileBuf = xcl::read_binary_file(binaryFile); // leggi bitstream
@@ -92,19 +96,10 @@ int main(int argc, char* argv[]){
 	cl::Buffer database_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, sizeof(char)*INPUT_SIZE*MAX_DIM, database);
     cl::Buffer score_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_WRITE_ONLY, sizeof(int)*INPUT_SIZE, score.data());
 
-    q.finish();
-
-	printf("Copying input sequences on the FPGA. \n");
+	std::cout <<("Copying input sequences on the FPGA. \n");
 
     // Data will be migrated to kernel space
     err = q.enqueueMigrateMemObjects({lenT_buffer, target_buffer, lenD_buffer, database_buffer}, 0); /*0 means from host*/
-
-    if (err != CL_SUCCESS) {
-            printf("Error: Failed to write to device memory!\n");
-            printf("Test failed\n");
-            exit(1);
-    }
-
 	q.finish();
 
 /////////////////////////		KERNEL EXCECUTION 		////////////////////////////////////
@@ -122,54 +117,46 @@ int main(int argc, char* argv[]){
 	OCL_CHECK(err, err = krnl.setArg(9, INPUT_SIZE));
 
 	if (err != CL_SUCCESS) {
-		printf("Error: Failed to set kernel arguments! %d\n", err);
-		printf("Test failed\n");
-		exit(1);
+		std::cout << "Error: Failed to set kernel arguments! " << err << std::endl;
+		std::cout << "Test failed" << std::endl;
+		return EXIT_FAILURE;;
 	}
 
 
-	q.finish();
-
-	printf("Running FPGA accelerator. \n");
+	std::cout <<("Running FPGA accelerator. \n");
 	auto start = std::chrono::high_resolution_clock::now();
 
 	//Launch the Kernels
     err = q.enqueueTask(krnl);
-
-
-    if (err) {
-        printf("Error: Failed to execute kernel! %d\n", err);
-        printf("Test failed\n");
-        exit(1);
-    }
-
+	if (err != CL_SUCCESS) {
+		std::cout << "Error: Failed to launch kernel(s)! " << err << std::endl;
+		std::cout << "Test failed" << std::endl;
+		return EXIT_FAILURE;;
+	}
 	q.finish();
 	
 	auto stop = std::chrono::high_resolution_clock::now();
 
     auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
-	float gcup = (double) (MAX_DIM * MAX_DIM * 20000 / (float)duration.count());
+	float gcup = (double) (cell_number / (float)duration.count());
 	
 	//Data from Kernel to Host
     err = q.enqueueMigrateMemObjects({score_buffer}, CL_MIGRATE_MEM_OBJECT_HOST);  
-
-
-    if (err != CL_SUCCESS) {
-        printf("Error: Failed to read output array! %d\n", err);
-        printf("Test failed\n");
-        exit(1);
-    }
-
+	if (err != CL_SUCCESS) {
+		std::cout << "Error: Failed to retrive objects from kernel(s)!" << err << std::endl;
+		std::cout << "Test failed" << std::endl;
+		return EXIT_FAILURE;;
+	}
 	q.finish();
 
-	printf("Finished FPGA excecution. \n");
-    printf("FPGA Kernel executed in %f ms \n", (float)duration.count() * 1e-6);
-	printf("GCUPS: %f \n",gcup);
+	std::cout << "Finished FPGA excecution." << std::endl;
+    std::cout << "FPGA Kernel executed in " << (float)duration.count() * 1e-6 << "ms" << std::endl;
+	std::cout << "GCUPS: " << gcup << std::endl;
 
 /////////////////////////			TESTBENCH			////////////////////////////////////
 	int golden_score[INPUT_SIZE];
 
-	printf("Running Software version. \n");
+	std::cout << "Running Software version." << std::endl;;
 	start = std::chrono::high_resolution_clock::now();
 
 	for (int golden_rep = 0; golden_rep < INPUT_SIZE; golden_rep++) {
@@ -179,23 +166,23 @@ int main(int argc, char* argv[]){
 	stop = std::chrono::high_resolution_clock::now();
 	duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
 	
-	printf("Software version executed in %f ns \n", (float)duration.count() * 1e-6);
+	std::cout << "Software version executed in " <<  (float)duration.count() * 1e-6<< " ns " << std::endl;
 
 	////////test bench results
-	printf("Comparing results. \n");
+	std::cout << "Comparing results. \n" << std::endl;
 	bool test_score=true;
 	for (int i=0; i < INPUT_SIZE; i++){
 		if (score[i]!=golden_score[i]){
 			printConf(target[i], database[i], ws, wd, gap_opening, enlargement);
-            printf("HW: %d, SW: %d\n", score[i], golden_score[i]);
+            std::cout << "HW: "<< score[i] << ", SW: " << golden_score[i] << std::endl;
             test_score=false;
         }
 	}
 
 	if (test_score) 
-		printf("Test PASSED: Output matches reference.\n");
+		std::cout << "Test PASSED: Output matches reference." << std::endl;
 	else {
-		printf("Test FAILED: Output does not match reference.\n");
+		std::cout << "Test FAILED: Output does not match reference." << std::endl;
 	}
 	
 

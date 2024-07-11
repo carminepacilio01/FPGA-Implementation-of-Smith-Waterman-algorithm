@@ -10,10 +10,8 @@
 
 #include "common/xcl2.hpp"
 
-#define MAX_DIM 102
-#define MAX_SEQ_LEN 30
-#define INPUT_SIZE 200
-
-#define NUM_KERNEL 1
+#define MAX_DIM 10
+#define MAX_SEQ_LEN 5
+#define INPUT_SIZE 1
 
 #endif // _HOST_H
