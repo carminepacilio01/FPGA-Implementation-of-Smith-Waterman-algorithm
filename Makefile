@@ -1,7 +1,7 @@
 COMMON_REPO = .
 PWD = $(shell readlink -f .)
 XF_PROJ_ROOT = $(shell readlink -f $(COMMON_REPO))
-FREQ_MHZ ?= 450
+FREQ_MHZ ?= 300
 HLS_HZ :=$(FREQ_MHZ)000000
 
 
