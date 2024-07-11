@@ -23,34 +23,51 @@ int main(int argc, char* argv[]){
 		return EXIT_FAILURE;
 	}
 
-    srandom(SEED);
+    srandom(static_cast<unsigned>(time(0)));
 
 	const int wd 			=  1; 	// match score
 	const int ws 			= -1;	// mismatch score
 	const int gap_opening	= -3;
 	const int enlargement 	= -1;
 
-	//	Input buffers
-	int lenT[INPUT_SIZE];
-	int lenD[INPUT_SIZE];
-	char target[INPUT_SIZE][MAX_SEQ_LEN];
-	char database[INPUT_SIZE][MAX_SEQ_LEN];
-
-	//	Buffers to store results of computations
-    int score[INPUT_SIZE];
-
-	printf("Programmin FPGA Device. \n");
-
-/////////////////////////		OPENCL CONFIGURATION 		////////////////////////////////////
-
-   	std::string binaryFile = argv[1]; // prendo il bitstream 
-    auto fileBuf = xcl::read_binary_file(binaryFile); // leggi bitstream
-    cl::Program::Binaries bins{{fileBuf.data(), fileBuf.size()}};
 
     cl_int err;
     cl::Context context;
     cl::Kernel sw_maxi;
+
     cl::CommandQueue q;
+	std::vector< int, aligned_allocator<int> > lenT(INPUT_SIZE);
+    std::vector< char, aligned_allocator<char> > target(INPUT_SIZE * MAX_DIM);
+    std::vector< int, aligned_allocator<int> > lenD(INPUT_SIZE);
+	std::vector< char, aligned_allocator<char> > database(INPUT_SIZE * MAX_DIM);
+    std::vector< int, aligned_allocator<int> > score(INPUT_SIZE);
+
+/////////////////////////		DATASET GENERATION 		////////////////////////////////////
+
+	printf("Generating %d random sequences pairs. \n", INPUT_SIZE);
+	///////Generation of random sequences
+	for(int i = 0; i < INPUT_SIZE; i++){
+
+		//	generate random length of the sequences
+		lenT[i] = (int)  gen_rnd(MAX_SEQ_LEN - 10, MAX_SEQ_LEN - 2);
+		lenD[i] = (int)  gen_rnd(MAX_SEQ_LEN - 10, MAX_SEQ_LEN - 2);
+
+		lenT[i] += 1;
+		lenD[i] += 1;
+
+		//	generate rand sequences
+		target[i][0] = database[i][0] = '-';
+		target[i][lenT[i]] = database[i][lenT[i]] = '\0';
+		random_seq_gen(lenT[i], target[i], lenD[i], database[i]);
+	}
+
+/////////////////////////		OPENCL CONFIGURATION 		////////////////////////////////////
+
+	printf("Programmin FPGA Device. \n");
+
+   	std::string binaryFile = argv[1]; // prendo il bitstream 
+    auto fileBuf = xcl::read_binary_file(binaryFile); // leggi bitstream
+    cl::Program::Binaries bins{{fileBuf.data(), fileBuf.size()}};
 
     auto devices = xcl::get_xil_devices(); // lista di devices
 
@@ -67,7 +84,7 @@ int main(int argc, char* argv[]){
             std::cout << "Failed to program device[" << i << "] with xclbin file!\n";
         } else {
             std::cout << "Device[" << i << "]: program successful!\n";
-            OCL_CHECK(err, sw_maxi= cl::Kernel(program, "decoderTop", &err));
+            OCL_CHECK(err, sw_maxi= cl::Kernel(program, "sw_maxi", &err));
             valid_device = true;
             break; // we break because we found a valid device
         }
@@ -77,98 +94,137 @@ int main(int argc, char* argv[]){
         exit(EXIT_FAILURE);
     }
 
-	////Mapping buffers onto HBM
-    cl_mem_ext_ptr_t lenT_buffer_ext;
-    cl_mem_ext_ptr_t target_buffer_ext;
-    cl_mem_ext_ptr_t lenD_buffer_ext;
-    cl_mem_ext_ptr_t database_buffer_ext;
-    cl_mem_ext_ptr_t score_buffer_ext;
+	// Create device buffers
+    std::vector<cl_mem_ext_ptr_t> lenT_buffer_ext(NUM_KERNEL);
+    std::vector<cl_mem_ext_ptr_t> target_buffer_ext(NUM_KERNEL);
+    std::vector<cl_mem_ext_ptr_t> lenD_buffer_ext(NUM_KERNEL);
+    std::vector<cl_mem_ext_ptr_t> database_buffer_ext(NUM_KERNEL);
+    std::vector<cl_mem_ext_ptr_t> score_buffer_ext(NUM_KERNEL);
 
-    lenT_buffer_ext.param = 0;
-    lenD_buffer_ext.param = 0;
-    target_buffer_ext.param = 0;
-    database_buffer_ext.param = 0;
-    score_buffer_ext.param = 0;
+    std::vector<cl::Buffer> lenT_buffer(NUM_KERNEL);
+    std::vector<cl::Buffer> target_buffer(NUM_KERNEL);
+    std::vector<cl::Buffer> lenD_buffer(NUM_KERNEL);
+    std::vector<cl::Buffer> database_buffer(NUM_KERNEL);
+    std::vector<cl::Buffer> score_buffer(NUM_KERNEL);
 
-    lenT_buffer_ext.flags = bank[0];
-    target_buffer_ext.flags = bank[1];
-    lenD_buffer_ext.flags = bank[2];
-    database_buffer_ext.flags = bank[3];
-    score_buffer_ext.flags = bank[4];
+	for(int i = 0; i < NUM_KERNEL; i++) {
 
-    lenT_buffer_ext.obj = lenT;
-    target_buffer_ext.obj = target;
-    lenD_buffer_ext.obj = lenD;
-    database_buffer_ext.obj = database;
-    score_buffer_ext.obj = score;
+        lenT_buffer_ext[i].obj = lenT.data();
+        lenT_buffer_ext[i].param = 0;
+        lenT_buffer_ext[i].flags = bank[i*5];
 
-    cl::Buffer lenT_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, INPUT_SIZE * sizeof(int), &lenT_buffer_ext);
-    cl::Buffer target_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, INPUT_SIZE * MAX_SEQ_LEN * sizeof(char), &target_buffer_ext);
-    cl::Buffer lenD_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, INPUT_SIZE * sizeof(int), &lenD_buffer_ext);
-    cl::Buffer database_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, INPUT_SIZE * MAX_SEQ_LEN * sizeof(char), &database_buffer_ext);
-    cl::Buffer score_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_WRITE_ONLY, INPUT_SIZE * sizeof(int), &score_buffer_ext);
+        target_buffer_ext[i].obj = target.data();
+        target_buffer_ext[i].param = 0;
+        target_buffer_ext[i].flags = bank[i*5+1];
+        
+        lenD_buffer_ext[i].obj = lenD.data();
+        lenD_buffer_ext[i].param = 0;
+        lenD_buffer_ext[i].flags = bank[i*5+2];
+
+        database_buffer_ext[i].obj = database.data();
+        database_buffer_ext[i].param = 0;
+        database_buffer_ext[i].flags = bank[i*5+3];
+
+        score_buffer_ext[i].obj = score.data();
+        score_buffer_ext[i].param = 0;
+        score_buffer_ext[i].flags = bank[i*5+4];
+
+    }
+
+    for (int i = 0; i < NUM_KERNEL; i++) {
+    	OCL_CHECK(err, lenT_buffer[i] = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_EXT_PTR_XILINX |
+                                    CL_MEM_USE_HOST_PTR, sizeof(int)*INPUT_SIZE, &lenT_buffer_ext[i], &err));
+
+        OCL_CHECK(err, target_buffer[i] = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_EXT_PTR_XILINX |
+                                    CL_MEM_USE_HOST_PTR, sizeof(char)*INPUT_SIZE*MAX_DIM, &target_buffer_ext[i], &err));
+
+        OCL_CHECK(err, lenD_buffer[i] = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_EXT_PTR_XILINX |
+                                    CL_MEM_USE_HOST_PTR, sizeof(int)*INPUT_SIZE, &lenD_buffer_ext[i], &err));
+
+        OCL_CHECK(err, database_buffer[i] = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_EXT_PTR_XILINX |
+                                    CL_MEM_USE_HOST_PTR, sizeof(char)*INPUT_SIZE*MAX_DIM, &database_buffer_ext[i], &err));
+
+        OCL_CHECK(err, score_buffer[i] = cl::Buffer(context, CL_MEM_WRITE_ONLY | CL_MEM_EXT_PTR_XILINX |
+                                    CL_MEM_USE_HOST_PTR, sizeof(int)*INPUT_SIZE, &score_buffer_ext[i], &err));
+	}
 
     q.finish();
 
-/////////////////////////		DATASET GENERATION 		////////////////////////////////////
-
-	printf("Generating %d random sequences pair \n", INPUT_SIZE);
-	///////Generation of random sequences
-	for(int i = 0; i < INPUT_SIZE; i++){
-
-		//	generate random length of the sequences
-		lenT[i] = (int)  gen_rnd(MAX_SEQ_LEN - 10, MAX_SEQ_LEN - 2);
-		lenD[i] = (int)  gen_rnd(MAX_SEQ_LEN - 10, MAX_SEQ_LEN - 2);
-
-		lenT[i] += 1;
-		lenD[i] += 1;
-
-		//	generate rand sequences
-		target[i][0] = database[i][0] = '-';
-		target[i][lenT[i]] = database[i][lenT[i]] = '\0';
-		random_seq_gen(lenT[i], target[i], lenD[i], database[i]);
-
-		//	Printing current configuration
-		printConf(target[i], database[i], ws, wd, gap_opening, enlargement);
-	}
-
-/////////////////////////		KERNEL EXCECUTION 		////////////////////////////////////
-
-	OCL_CHECK(err, err = sw_maxi.setArg(0, lenT_buffer));
-	OCL_CHECK(err, err = sw_maxi.setArg(1, target_buffer));
-    OCL_CHECK(err, err = sw_maxi.setArg(2, lenD_buffer));
-    OCL_CHECK(err, err = sw_maxi.setArg(3, database_buffer));
-    OCL_CHECK(err, err = sw_maxi.setArg(4, wd));
-    OCL_CHECK(err, err = sw_maxi.setArg(5, ws));
-    OCL_CHECK(err, err = sw_maxi.setArg(6, gap_opening));
-    OCL_CHECK(err, err = sw_maxi.setArg(7, enlargement));
-    OCL_CHECK(err, err = sw_maxi.setArg(8, score_buffer));
-	OCL_CHECK(err, err = sw_maxi.setArg(9, INPUT_SIZE));
-
 	printf("Copying input sequences on the FPGA. \n");
     // Data will be migrated to kernel space
-    OCL_CHECK(err, q.enqueueMigrateMemObjects({lenT_buffer, target_buffer, lenD_buffer, database_buffer}, 0)); /*0 means from host*/
-	OCL_CHECK(err, q.finish());
+	for(int i = 0; i < NUM_KERNEL; i++)
+        err = commands.enqueueMigrateMemObjects({lenT_buffer[i], target_buffer[i], lenD_buffer[i], database_buffer[i]}, 0); /*0 means from host*/
+
+    if (err != CL_SUCCESS) {
+            printf("Error: Failed to write to device memory!\n");
+            printf("Test failed\n");
+            exit(1);
+    }
+
+	q.finish();
+
+/////////////////////////		KERNEL EXCECUTION 		////////////////////////////////////
+	
+	// Set the arguments for kernel execution
+	for (int i = 0; i < NUM_KERNEL; i++) {
+		OCL_CHECK(err, err = sw_maxi.setArg(0, lenT_buffer[i]));
+		OCL_CHECK(err, err = sw_maxi.setArg(1, target_buffer[i]));
+		OCL_CHECK(err, err = sw_maxi.setArg(2, lenD_buffer[i]));
+		OCL_CHECK(err, err = sw_maxi.setArg(3, database_buffer[i]));
+		OCL_CHECK(err, err = sw_maxi.setArg(4, wd));
+		OCL_CHECK(err, err = sw_maxi.setArg(5, ws));
+		OCL_CHECK(err, err = sw_maxi.setArg(6, gap_opening));
+		OCL_CHECK(err, err = sw_maxi.setArg(7, enlargement));
+		OCL_CHECK(err, err = sw_maxi.setArg(8, score_buffer[i]));
+		OCL_CHECK(err, err = sw_maxi.setArg(9, INPUT_SIZE));
+
+		if (err != CL_SUCCESS) {
+			printf("Error: Failed to set kernel arguments! %d\n", err);
+			printf("Test failed\n");
+			exit(1);
+		}
+	}
+
+	q.finish();
 
 	printf("Running FPGA accelerator. \n");
 	auto start = std::chrono::high_resolution_clock::now();
 
-	//Launch the Kernel
-	q.enqueueTask(sw_maxi);
-	OCL_CHECK(err, q.finish());
+	//Launch the Kernels
+	for (int i = 0; i < NUM_KERNEL; ++i)
+        err |= commands.enqueueTask(sw_maxi);
+
+
+    if (err) {
+        printf("Error: Failed to execute kernel! %d\n", err);
+        printf("Test failed\n");
+        exit(1);
+    }
+
+	q.finish();
 	
 	auto stop = std::chrono::high_resolution_clock::now();
 
     auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
 	float gcup = (double) (MAX_SEQ_LEN * MAX_SEQ_LEN / (float)duration.count() ) * 1e-9;
+	
+	//Data from Kernel to Host
+	for (int i = 0; i < NUM_KERNEL; ++i) {
+        err = commands.enqueueMigrateMemObjects({score_buffer[i]}, CL_MIGRATE_MEM_OBJECT_HOST);  
+    }
+
+
+    if (err != CL_SUCCESS) {
+        printf("Error: Failed to read output array! %d\n", err);
+        printf("Test failed\n");
+        exit(1);
+    }
+
+	q.finish();
 
 	printf("Finished FPGA excecution. \n");
     printf("FPGA Kernel executed in %f ns \n", (float)duration.count());
 	printf("GCUPS: %f \n",gcup);
-	
-	//Data from Kernel to Host
-	q.enqueueMigrateMemObjects({score_buffer}, CL_MIGRATE_MEM_OBJECT_HOST);
-	q.finish();
 
 /////////////////////////			TESTBENCH			////////////////////////////////////
 	int golden_score[INPUT_SIZE];
@@ -187,16 +243,20 @@ int main(int argc, char* argv[]){
 
 	////////test bench results
 	printf("Comparing results. \n");
-	for(int i; i < INPUT_SIZE; i++){
-		if(score[i] != golden_score[i]){
-			printf("Test FAILED: Output does not match reference.\n");
-			printf("Golden Score: %d | Kernel Score: %d \n ", golden_score[i], score[i]);
+	for (int i=0; i<num; i++){
+		if (scores[i]!=golden_scores[i]){
 			printConf(target[i], database[i], ws, wd, gap_opening, enlargement);
-			return EXIT_FAILURE;
-		}
+            printf("HW: %d, SW: %d\n", scores[i], goleden_scores[i]);
+            test_score=false;
+        }
 	}
 
-	printf("Test PASSED: Output matches reference.\n");
+	if (test_score) 
+		printf("Test PASSED: Output matches reference.\n");
+	else {
+		printf("Test FAILED: Output does not match reference.\n");
+	}
+	
 
 	return 0;
 }
