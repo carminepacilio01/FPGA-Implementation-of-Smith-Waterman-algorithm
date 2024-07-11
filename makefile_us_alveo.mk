@@ -42,6 +42,7 @@ VPP_CFLAGS :=
 CMD_ARGS = $(BUILD_DIR)/$(KERNEL_NAME).xclbin
 CXXFLAGS += -I$(XILINX_XRT)/include -I$(XILINX_VIVADO)/include -Wall -O0 -g -std=c++1y
 LDFLAGS += -L$(XILINX_XRT)/lib -pthread -lOpenCL
+LDLFLAGS += --config sw_maxi.ini
 
 ########################## Checking if PLATFORM in allowlist #######################
 PLATFORM_BLOCKLIST += nodma 
@@ -56,7 +57,7 @@ LDFLAGS += -lrt -lstdc++
 ############################## Setting up Kernel Variables ##############################
 # Kernel compiler global settings
 VPP_FLAGS += --save-temps --vivado.synth.jobs $(JOBS) --vivado.impl.jobs $(JOBS) --hls.jobs $(JOBS)
-KERN_SRCS += Design/smith_waterman.cpp Design/smith_waterman.hpp
+KERN_SRCS += Design/smith_waterman.cpp Design/smith_waterman.h
 
 EXECUTABLE = ./$(KERNEL_NAME)
 EMCONFIG_DIR = $(TEMP_DIR)
@@ -93,7 +94,7 @@ $(BUILD_DIR)/$(KERNEL_NAME).xclbin: $(TEMP_DIR)/$(KERNEL_NAME).xo
 #REMEMBER TO DELETE ME
 ##########################################
 testVARS:
-	@echo v++ -c $(VPP_FLAGS) $(VPP_CFLAGS) -t $(TARGET) --platform $(PLATFORM) -k decoderTop --temp_dir $(TEMP_DIR)  -I'$(<D)' -o'$@' $(KERN_SRCS)
+	@echo v++ -c $(VPP_FLAGS) $(VPP_CFLAGS) -t $(TARGET) --platform $(PLATFORM) -k sw_maxi --temp_dir $(TEMP_DIR)  -I'$(<D)' -o'$@' $(KERN_SRCS)
 	@echo v++ -l $(VPP_FLAGS) $(VPP_LDFLAGS) -t $(TARGET) --platform $(PLATFORM) --temp_dir $(TEMP_DIR) -o'$(LINK_OUTPUT)' $(+)
 	@echo v++ -p $(LINK_OUTPUT) $(VPP_FLAGS) -t $(TARGET) --platform $(PLATFORM) --package.out_dir $(PACKAGE_OUT) -o $(BUILD_DIR)/$(KERNEL_NAME).xclbin
 
