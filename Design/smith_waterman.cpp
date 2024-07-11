@@ -1,7 +1,7 @@
 //	Implementation of the Smith-Waterman (Gotoh)
 //  Author: Carmine Pacilio
 //	Year: 2024
-#include "smith_waterman.hpp"
+#include "smith_waterman.h"
 
 void computeSW(int lenT, char *target, int lenD, char *database, conf_t scoring, int *score) {
 
@@ -60,7 +60,6 @@ void computeSW(int lenT, char *target, int lenD, char *database, conf_t scoring,
 
     compute_score: for (int num_diag = 0; num_diag < t_diag; num_diag++) {
 #pragma HLS LOOP_TRIPCOUNT min=1 max=MAX_REP
-#pragma HLS INLINE RECURSIVE
 #pragma HLS PIPELINE II=1
 
         if (num_diag < lenT) {
