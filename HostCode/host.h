@@ -10,8 +10,6 @@
 
 #include "common/xcl2.hpp"
 
-#define SEED 2
-
 #define MAX_DIM 102
 #define MAX_SEQ_LEN 10
 #define INPUT_SIZE 200
