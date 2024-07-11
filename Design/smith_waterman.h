@@ -6,10 +6,10 @@
 #include <vector>
 #include <limits>
 
-#define MAX_DIM 10
+#define MAX_DIM 1024
 #define MAX_REP MAX_DIM * 2
 #define MATRIX_SIZE MAX_DIM * MAX_DIM
-#define INPUT_SIZE 1
+#define INPUT_SIZE 10000
 
 #define UP 0
 #define UP_LEFT -1
