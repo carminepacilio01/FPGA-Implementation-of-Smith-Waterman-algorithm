@@ -66,3 +66,14 @@ HostCode/host.cpp
 .run/2277635/sw_emu/device0/memory_map_file
 .run/2277635/sw_emu/device0/binary_0/dltmp
 .run/2277635/sw_emu/device0/binary_0/xmltmp
+v++_sw_maxi_2312453.backup.log
+v++_sw_maxi.link.log
+_x/v++_package_sw_maxi_guidance.pb3
+_x/logs/package/package.steps.log
+_x/logs/package/v++.log
+_x/package/extractedSystemDiagram.json
+_x/package/package.spr
+_x/package/package.steps.log
+_x/package/packagedSystemDiagram.json
+_x/reports/package/v++_package_sw_maxi_guidance.html
+emconfig.json
