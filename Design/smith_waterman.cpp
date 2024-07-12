@@ -13,7 +13,6 @@ void computeSW(int lenT, char *target, int lenD, char *database, conf_t scoring,
 
     //copy the target sequence reversed
     for (int i = 0; i < lenT; i++) {
-#pragma HLS LOOP_TRIPCOUNT min=1 max=MAX_DIM
 #pragma HLS PIPELINE II=1
 
         target_l[i] = target[lenT - i - 1];
@@ -25,12 +24,11 @@ void computeSW(int lenT, char *target, int lenD, char *database, conf_t scoring,
 	int p_buffer[3][MAX_DIM * 2];
 	int q_buffer[3][MAX_DIM * 2];
 	int d_buffer[3][MAX_DIM * 2];
-#pragma HLS ARRAY_PARTITION variable=p_buffer block factor=3 dim=1
-#pragma HLS ARRAY_PARTITION variable=q_buffer block factor=3 dim=1
-#pragma HLS ARRAY_PARTITION variable=d_buffer block factor=3 dim=1
+#pragma HLS ARRAY_PARTITION variable=p_buffer complete dim=1
+#pragma HLS ARRAY_PARTITION variable=q_buffer complete dim=1
+#pragma HLS ARRAY_PARTITION variable=d_buffer complete dim=1
 
     init_buffers: for(int index = 0; index < MAX_REP; index++) {
-#pragma HLS LOOP_TRIPCOUNT min=1 max=MAX_REP
 #pragma HLS PIPELINE II=1
 
         p_buffer[0][index] = 0;
@@ -59,7 +57,6 @@ void computeSW(int lenT, char *target, int lenD, char *database, conf_t scoring,
     int score_l = 0;
 
     compute_score: for (int num_diag = 0; num_diag < t_diag; num_diag++) {
-#pragma HLS LOOP_TRIPCOUNT min=1 max=MAX_REP
 #pragma HLS PIPELINE II=1
 
         if (num_diag < lenT) {
@@ -88,16 +85,12 @@ void computeSW(int lenT, char *target, int lenD, char *database, conf_t scoring,
             diag_len--;
         }
 
-
-
         // PE
         compute_diagonal: for (int j = 0; j < diag_len; ++j) {
-#pragma HLS LOOP_TRIPCOUNT min=1 max=MAX_DIM
 #pragma HLS DEPENDENCE variable=p_buffer inter false
 #pragma HLS DEPENDENCE variable=q_buffer inter false
 #pragma HLS DEPENDENCE variable=d_buffer inter false
 #pragma HLS UNROLL factor=4
-
 
             int current_index = database_cursor + j;
             int two_diag = (diag_index == 0) ? 1 : (diag_index == 1) ? 2 : 0;
@@ -139,6 +132,7 @@ void computeSW(int lenT, char *target, int lenD, char *database, conf_t scoring,
 
 void readInput(int lenT[INPUT_SIZE], int lenT_local[INPUT_SIZE], char target[INPUT_SIZE][MAX_DIM], char t_local[INPUT_SIZE][MAX_DIM],
 		int lenD[INPUT_SIZE], int lenD_local[INPUT_SIZE], char database[INPUT_SIZE][MAX_DIM], char db_local[INPUT_SIZE][MAX_DIM]){
+#pragma HLS INLINE off
 
 	memcpy(lenT_local, lenT, sizeof(int) * INPUT_SIZE);
 	memcpy(lenD_local, lenD, sizeof(int) * INPUT_SIZE);
@@ -148,6 +142,7 @@ void readInput(int lenT[INPUT_SIZE], int lenT_local[INPUT_SIZE], char target[INP
 }
 
 void writeOutput(int score_l[INPUT_SIZE], int score[INPUT_SIZE]){
+#pragma HLS INLINE off
 
 	memcpy(score, score_l, sizeof(int) * INPUT_SIZE);
 }
@@ -155,7 +150,6 @@ void writeOutput(int score_l[INPUT_SIZE], int score[INPUT_SIZE]){
 //////////////////MASTER AXI
 extern "C" {
     void sw_maxi(int lenT[INPUT_SIZE], char target[INPUT_SIZE][MAX_DIM], int lenD[INPUT_SIZE], char database[INPUT_SIZE][MAX_DIM], int wd, int ws, int gap_opening, int enlargement, int score[INPUT_SIZE], int input_len) {
-
     #pragma HLS INTERFACE s_axilite port=return bundle=control
 
     #pragma HLS INTERFACE m_axi port=lenT bundle=gmem depth=INPUT_SIZE offset=slave
@@ -183,21 +177,12 @@ extern "C" {
         local_conf.gap_extension	= enlargement;
 
         int lenT_local[INPUT_SIZE];
-    #pragma HLS ARRAY_PARTITION variable=lenT_local type=complete dim=1
         char t_local[INPUT_SIZE][MAX_DIM];
-    #pragma HLS ARRAY_PARTITION variable=t_local block factor=2 dim=1
         int lenD_local[INPUT_SIZE];
-    #pragma HLS ARRAY_PARTITION variable=lenD_local type=complete dim=1
         char db_local[INPUT_SIZE][MAX_DIM];
-    #pragma HLS ARRAY_PARTITION variable=db_local block factor=2 dim=1
         int score_l[INPUT_SIZE];
-    #pragma HLS ARRAY_PARTITION variable=score_l type=complete dim=1
-
-
-
 
     #pragma HLS DATAFLOW
-
         readInput(lenT, lenT_local, target, t_local, lenD, lenD_local, database, db_local);
 
         compute_SW_loop: for (int i = 0; i < input_len; i++) {
