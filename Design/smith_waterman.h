@@ -2,14 +2,14 @@
 #define _SMITH_WATERMAN_H
 
 #include <iostream>
-#include <string.h>
 #include <vector>
 #include <limits>
+#include <string.h>
 
-#define MAX_DIM 1024
+#define MAX_DIM 256
 #define MAX_REP MAX_DIM * 2
 #define MATRIX_SIZE MAX_DIM * MAX_DIM
-#define INPUT_SIZE 100
+#define INPUT_SIZE 8000
 
 #define UP 0
 #define UP_LEFT -1

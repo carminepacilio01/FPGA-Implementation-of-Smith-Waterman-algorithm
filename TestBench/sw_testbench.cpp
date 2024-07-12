@@ -1,9 +1,9 @@
 // Test Bench for the implementation of the Smith-Waterman (Gotoh)
 #include <random>
-#include "smith_waterman.hpp"
+#include "smith_waterman.h"
 #include <time.h>
 
-#define MAX_SEQ_LEN 1000
+#define MAX_SEQ_LEN 100
 
 void printConf(char *seqA, char *seqB, int ws, int wd, int gap_opening, int enlargement);
 void fprintMatrix(int *P, int *D, int *Q, int lenA, int lenB);
