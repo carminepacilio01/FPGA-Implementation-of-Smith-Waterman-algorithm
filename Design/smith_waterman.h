@@ -9,7 +9,7 @@
 #define MAX_DIM 256
 #define MAX_REP MAX_DIM * 2
 #define MATRIX_SIZE MAX_DIM * MAX_DIM
-#define INPUT_SIZE 8000
+#define INPUT_SIZE 5000
 
 #define UP 0
 #define UP_LEFT -1
