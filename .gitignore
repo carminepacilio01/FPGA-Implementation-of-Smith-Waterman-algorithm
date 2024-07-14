@@ -32,23 +32,21 @@
 *.app
 
 # DS_store
-.DS_store
+*.DS_store
 HostCode/.DS_Store
 
 # VScode
 .vscode
 
 #build files
-.run
-_x.hw_emu.xilinx_u55c_gen3x16_xdma_3_202210_1/sw_maxi.xo.compile_summary
-build_dir.hw.xilinx_u55c_gen3x16_xdma_3_202210_1
-v++_sw_maxi_3376320.backup.log
-v++_sw_maxi.link.log
-v++_sw_maxi.log
-xcd.log
-xrt.run_summary
 _x.hw.xilinx_u55c_gen3x16_xdma_3_202210_1
+.run
 _x
 .ipcache
 package.hw
 .Xil
+*.link.*
+*.log
+*.compile_summary
+*.run_summary
+*.package_summary
