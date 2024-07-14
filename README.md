@@ -22,5 +22,5 @@ source /xilinx/software/Vitis/<Vitis_Version>/settings64.sh
 ```
 Then, open the terminal in the `Build` folder and run the following:
 ```bash
-./sw_maxi ./Build/<Build_Number>>/sw_maxi.xclbin
+./sw_maxi ./Build/<Build_Number>/sw_maxi.xclbin
 ```
