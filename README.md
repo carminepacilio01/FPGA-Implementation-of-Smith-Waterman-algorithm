@@ -20,7 +20,7 @@ Once cloned, source the necessary tools:
 source /opt/xilinx/xrt/setup.sh
 source /xilinx/software/Vitis/<Vitis_Version>/settings64.sh
 ```
-Then, open the terminal in the `Build` folder and run the following:
+Then, open the terminal in the `Build/<Build_Number>` folder and run the following:
 ```bash
-./sw_maxi ./Build/<Build_Number>/sw_maxi.xclbin
+./sw_maxi ./sw_maxi.xclbin
 ```
