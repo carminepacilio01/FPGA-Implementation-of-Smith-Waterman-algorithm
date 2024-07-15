@@ -55,6 +55,7 @@ LDFLAGS += -lrt -lstdc++
 
 ############################## Setting up Kernel Variables ##############################
 # Kernel compiler global settings
+VPP_FLAGS += --config $(KERNEL_NAME).ini
 VPP_FLAGS += --save-temps --vivado.synth.jobs $(JOBS) --vivado.impl.jobs $(JOBS) --hls.jobs $(JOBS)
 KERN_SRCS += Design/smith_waterman.cpp Design/smith_waterman.h
 
