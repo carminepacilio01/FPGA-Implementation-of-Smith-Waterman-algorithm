@@ -40,6 +40,7 @@ HostCode/.DS_Store
 
 #build files
 _x.hw.xilinx_u55c_gen3x16_xdma_3_202210_1
+_x.sw_emu.xilinx_u55c_gen3x16_xdma_3_202210_1
 .run
 _x
 .ipcache
