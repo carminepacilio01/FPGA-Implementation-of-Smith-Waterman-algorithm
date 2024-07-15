@@ -166,7 +166,7 @@ int main(int argc, char* argv[]){
 	stop = std::chrono::high_resolution_clock::now();
 	duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
 	
-	std::cout << "Software version executed in " <<  (float)duration.count() * 1e-6<< " ns " << std::endl;
+	std::cout << "Software version executed in " <<  (float)duration.count() * 1e-6 << " ms " << std::endl;
 
 	////////test bench results
 	std::cout << "Comparing results. \n" << std::endl;
