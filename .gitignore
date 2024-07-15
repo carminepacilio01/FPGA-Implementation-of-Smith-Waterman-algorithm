@@ -50,3 +50,6 @@ package.hw
 *.compile_summary
 *.run_summary
 *.package_summary
+emconfig.json
+opencl_trace.csv
+summary.csv
