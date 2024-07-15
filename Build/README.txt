@@ -23,6 +23,6 @@ INPUT_SIZE 6000
 ---- B5 -----
 MAX_DIM 256
 INPUT_SIZE 1000
-2 Kernel 
+3 Kernel 
 
 

@@ -29,10 +29,6 @@ void computeSW(int lenT, char *target, int lenD, char *database, conf_t scoring,
 #pragma HLS ARRAY_PARTITION variable=q_buffer complete dim=1
 #pragma HLS ARRAY_PARTITION variable=d_buffer complete dim=1
 
-#pragma HLS ARRAY_PARTITION variable=p_buffer block factor=4 dim=2
-#pragma HLS ARRAY_PARTITION variable=q_buffer block factor=4 dim=2
-#pragma HLS ARRAY_PARTITION variable=d_buffer block factor=4 dim=2
-
     init_buffers: for(int index = 0; index < MAX_DIM*2; index++) {
 #pragma HLS LOOP_TRIPCOUNT min=MAX_DIM*2 max=MAX_DIM*2
 #pragma HLS PIPELINE II=1
@@ -140,7 +136,7 @@ void computeSW(int lenT, char *target, int lenD, char *database, conf_t scoring,
 
 void readInput(int lenT[INPUT_SIZE], int lenT_local[INPUT_SIZE], char target[INPUT_SIZE][MAX_DIM], char t_local[INPUT_SIZE][MAX_DIM],
 		int lenD[INPUT_SIZE], int lenD_local[INPUT_SIZE], char database[INPUT_SIZE][MAX_DIM], char db_local[INPUT_SIZE][MAX_DIM]){
-
+    
 	memcpy(lenT_local, lenT, sizeof(int) * INPUT_SIZE);
 	memcpy(lenD_local, lenD, sizeof(int) * INPUT_SIZE);
 	memcpy(db_local, database, sizeof(char) * INPUT_SIZE * MAX_DIM);
@@ -148,14 +144,20 @@ void readInput(int lenT[INPUT_SIZE], int lenT_local[INPUT_SIZE], char target[INP
 
 }
 
-void writeOutput(int score_l[INPUT_SIZE], int score[INPUT_SIZE]){
+void writeOutput(int score_l[INPUT_SIZE], int score[INPUT_SIZE], int offset, int input_len){
 
-	memcpy(score, score_l, sizeof(int) * INPUT_SIZE);
+	for(int iter = 0; iter < input_len; iter++){
+#pragma HLS LOOP_TRIPCOUNT min=0 max=INPUT_SIZE
+#pragma HLS PIPELINE II=1
+        score[iter+offset] = score_l[iter];
+    }
 }
 
 //////////////////MASTER AXI
 extern "C" {
-    void sw_maxi(int lenT[INPUT_SIZE], char target[INPUT_SIZE][MAX_DIM], int lenD[INPUT_SIZE], char database[INPUT_SIZE][MAX_DIM], int wd, int ws, int gap_opening, int enlargement, int score[INPUT_SIZE], int input_len) {
+    void sw_maxi(int lenT[INPUT_SIZE], char target[INPUT_SIZE][MAX_DIM], int lenD[INPUT_SIZE], char database[INPUT_SIZE][MAX_DIM], 
+    int wd, int ws, int gap_opening, int enlargement, int score[INPUT_SIZE], 
+    int offset, int input_len) {
 #pragma HLS INTERFACE s_axilite port=return bundle=control
 
 #pragma HLS INTERFACE m_axi port=lenT bundle=gmem depth=INPUT_SIZE offset=slave
@@ -173,6 +175,7 @@ extern "C" {
 #pragma HLS INTERFACE s_axilite port=gap_opening bundle=control
 #pragma HLS INTERFACE s_axilite port=enlargement bundle=control
 #pragma HLS INTERFACE s_axilite port=score bundle=control
+#pragma HLS INTERFACE s_axilite port=offset bundle=control
 #pragma HLS INTERFACE s_axilite port=input_len bundle=control
 
     //	Defining configuration for scoring
@@ -195,10 +198,9 @@ extern "C" {
 #pragma HLS LOOP_TRIPCOUNT min=0 max=INPUT_SIZE
 #pragma HLS PIPELINE  II=1
 
-        computeSW(lenT_local[i], t_local[i], lenD_local[i], db_local[i], local_conf, &score_l[i]);
+        computeSW(lenT_local[i+offset], t_local[i+offset], lenD_local[i+offset], db_local[i+offset], local_conf, &score_l[i]);
         }
 
-        writeOutput(score_l, score);
+        writeOutput(score_l, score, offset, input_len);
     }
 }
-

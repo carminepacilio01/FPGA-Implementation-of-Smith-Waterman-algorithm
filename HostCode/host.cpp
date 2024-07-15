@@ -21,7 +21,7 @@ int main(int argc, char* argv[]){
 
     cl_int 				err;
     cl::Context 		context;
-    cl::Kernel krnl;
+    cl::Kernel 			krnl;
     cl::CommandQueue 	q;
 
 	std::vector< int, aligned_allocator<int> > 		lenT(INPUT_SIZE);
@@ -72,7 +72,7 @@ int main(int argc, char* argv[]){
         auto device = devices[i];
         // Creating Context and Command Queue for selected Device
         OCL_CHECK(err, context = cl::Context(device, nullptr, nullptr, nullptr, &err));
-        OCL_CHECK(err, q = cl::CommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE, &err));
+        OCL_CHECK(err, q = cl::CommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE | CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, &err));
         std::cout << "Trying to program device[" << i << "]: " << device.getInfo<CL_DEVICE_NAME>() << std::endl;
         cl::Program program(context, {device}, bins, nullptr, &err);
         if (err != CL_SUCCESS) {
@@ -103,7 +103,7 @@ int main(int argc, char* argv[]){
 	q.finish();
 
 /////////////////////////		KERNEL EXCECUTION 		////////////////////////////////////
-	
+
 	// Set the arguments for kernel execution
 	OCL_CHECK(err, err = krnl.setArg(0, lenT_buffer));
 	OCL_CHECK(err, err = krnl.setArg(1, target_buffer));
@@ -114,7 +114,7 @@ int main(int argc, char* argv[]){
 	OCL_CHECK(err, err = krnl.setArg(6, gap_opening));
 	OCL_CHECK(err, err = krnl.setArg(7, enlargement));
 	OCL_CHECK(err, err = krnl.setArg(8, score_buffer));
-	OCL_CHECK(err, err = krnl.setArg(9, INPUT_SIZE));
+
 
 	if (err != CL_SUCCESS) {
 		std::cout << "Error: Failed to set kernel arguments! " << err << std::endl;
@@ -122,21 +122,24 @@ int main(int argc, char* argv[]){
 		return EXIT_FAILURE;;
 	}
 
-
 	std::cout <<("Running FPGA accelerator. \n");
-	auto start = std::chrono::high_resolution_clock::now();
-
+	
 	//Launch the Kernels
-    err = q.enqueueTask(krnl);
+	auto start = std::chrono::high_resolution_clock::now();
+	for(int cu = 0; cu < 4; cu++) {
+		OCL_CHECK(err, err = krnl.setArg(9, cu * INPUT_SIZE / 4));
+		OCL_CHECK(err, err = krnl.setArg(10, INPUT_SIZE / 4));
+         q.enqueueTask(krnl);
+     }
+	q.finish();
+	auto stop = std::chrono::high_resolution_clock::now();
+
 	if (err != CL_SUCCESS) {
 		std::cout << "Error: Failed to launch kernel(s)! " << err << std::endl;
 		std::cout << "Test failed" << std::endl;
 		return EXIT_FAILURE;;
 	}
-	q.finish();
 	
-	auto stop = std::chrono::high_resolution_clock::now();
-
     auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
 	float gcup = (double) (cell_number / (float)duration.count());
 	

@@ -55,7 +55,6 @@ LDFLAGS += -lrt -lstdc++
 
 ############################## Setting up Kernel Variables ##############################
 # Kernel compiler global settings
-VPP_FLAGS += --config $(KERNEL_NAME).ini
 VPP_FLAGS += --save-temps --vivado.synth.jobs $(JOBS) --vivado.impl.jobs $(JOBS) --hls.jobs $(JOBS)
 KERN_SRCS += Design/smith_waterman.cpp Design/smith_waterman.h
 
@@ -87,7 +86,7 @@ $(TEMP_DIR)/$(KERNEL_NAME).xo: Design/smith_waterman.cpp
 
 $(BUILD_DIR)/$(KERNEL_NAME).xclbin: $(TEMP_DIR)/$(KERNEL_NAME).xo
 	mkdir -p $(BUILD_DIR)
-	v++ -l $(VPP_FLAGS) $(VPP_LDFLAGS) -t $(TARGET) --platform $(PLATFORM) --temp_dir $(TEMP_DIR) -o'$(LINK_OUTPUT)' $(+)
+	v++ -l --config $(KERNEL_NAME).ini $(VPP_FLAGS) $(VPP_LDFLAGS) -t $(TARGET) --platform $(PLATFORM) --temp_dir $(TEMP_DIR) -o'$(LINK_OUTPUT)' $(+)
 	v++ -p $(LINK_OUTPUT) $(VPP_FLAGS) -t $(TARGET) --platform $(PLATFORM) --package.out_dir $(PACKAGE_OUT) -o $(BUILD_DIR)/$(KERNEL_NAME).xclbin
 
 ############################## Setting Rules for Host (Building Host Executable) ##############################
