@@ -13,7 +13,7 @@ To accelerate this algorithm, I used Vitis HLS to write the top function and the
 To run this implementation on FPGA, first clone the repository using:
 
 ```bash
-[git clone https://github.com/carminepacilio01/Accelerated-Smith-Waterman-algorithm-on-FPGA.git](https://github.com/carminepacilio01/FPGA-Implementayion-of-Smith-Waterman-algorithm.git)
+git clone https://github.com/carminepacilio01/Accelerated-Smith-Waterman-algorithm-on-FPGA.git
 ```
 Once cloned, source the necessary tools:
 ```bash
