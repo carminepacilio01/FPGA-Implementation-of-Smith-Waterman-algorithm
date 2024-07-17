@@ -4,7 +4,7 @@ This repository showcases the source code for my project "Accelerated Smith-Wate
 To accelerate this algorithm, I used Vitis HLS to write the top function and then used OpenCL and Vitis compiler to build the host and kernel for FPGA usage.
 
 ## Repository Structure
-* `Build` Contains the build to run simulations.
+* `Build` Contains pre built binaries to replicate the experiment.
 * `Design` Contains the source code for the c++ top function.
 * `HostCode` Contains the host implementation.
 * `TestBench` Contains the vitis HLS testbench.
