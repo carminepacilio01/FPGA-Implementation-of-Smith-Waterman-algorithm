@@ -126,9 +126,9 @@ int main(int argc, char* argv[]){
 	
 	//Launch the Kernels
 	auto start = std::chrono::high_resolution_clock::now();
-	for(int cu = 0; cu < 4; cu++) {
-		OCL_CHECK(err, err = krnl.setArg(9, cu * INPUT_SIZE / 4));
-		OCL_CHECK(err, err = krnl.setArg(10, INPUT_SIZE / 4));
+	for(int cu = 0; cu < 6; cu++) {
+		OCL_CHECK(err, err = krnl.setArg(9, cu * INPUT_SIZE / 6));
+		OCL_CHECK(err, err = krnl.setArg(10, INPUT_SIZE / 6));
          q.enqueueTask(krnl);
      }
 	q.finish();

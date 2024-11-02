@@ -54,3 +54,5 @@ package.hw
 emconfig.json
 opencl_trace.csv
 summary.csv
+build_*
+Build/

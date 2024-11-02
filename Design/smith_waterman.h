@@ -36,7 +36,7 @@ extern "C" {
 	);
 }
 
-void computeSW(int lenT, char *target, int lenD, char *database, conf_t scoring, int *score);
+void computeSW(int lenT, char *target_l, int lenD, char *database_l, conf_t scoring, int *score);
 void readInput(int lenT[MAX_DIM], int lenT_local[MAX_DIM], char target[INPUT_SIZE][MAX_DIM], char t_local[INPUT_SIZE][MAX_DIM], int lenD[MAX_DIM], int lenD_local[MAX_DIM], char database[INPUT_SIZE][MAX_DIM], char db_local[INPUT_SIZE][MAX_DIM]);
 void writeOutput(int score_l[INPUT_SIZE], int score[INPUT_SIZE], int offset, int input_len);
 
