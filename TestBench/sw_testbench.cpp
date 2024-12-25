@@ -1,15 +1,16 @@
 // Test Bench for the implementation of the Smith-Waterman (Gotoh)
 #include <random>
-#include "../Design/smith_waterman.h"
+#include "smith_waterman.h"
 #include <time.h>
 
-#define MAX_SEQ_LEN 100
+#define MAX_DIMEN MAX_DIM
 
 void printConf(char *seqA, char *seqB, int ws, int wd, int gap_opening, int enlargement);
-void fprintMatrix(int *P, int *D, int *Q, int lenA, int lenB);
+void fprintMatrix(int *P, int *Dsw_testbench, int *Q, int lenA, int lenB);
 int compute_golden(int lenA, char *seqA, int lenB, char *seqB, int wd, int ws, int gap_opening, int enlargement);
 void random_seq_gen(int lenA, char *seqA, int lenB, char *seqB);
 int gen_rnd(int min, int max);
+void reverse_str(int len, char *str);
 
 using namespace std;
 
@@ -38,8 +39,8 @@ int main(int argc, char const *argv[]) {
 
 		//	generate random sequences
 		//	length of the sequences
-		lenA[i] = (int)  gen_rnd(MAX_SEQ_LEN - 10, MAX_SEQ_LEN - 2);
-		lenB[i] = (int)  gen_rnd(MAX_SEQ_LEN - 10, MAX_SEQ_LEN - 2);
+		lenA[i] = (int)  gen_rnd(MAX_DIMEN - 10, MAX_DIMEN - 2);
+		lenB[i] = (int)  gen_rnd(MAX_DIMEN - 10, MAX_DIMEN - 2);
 
 		lenA[i] += 1;
 		lenB[i] += 1;
@@ -75,15 +76,22 @@ int main(int argc, char const *argv[]) {
 		mean_golden_time += cpu_time_used;
 		mean_golden_gcup += gcup;
 	}
-	
+
     printf("Mean Execution time of Host Code: %f ms\n", mean_golden_time / n * 1e3);
 
-	//////////// GCUPS
-    printf("Mean GCUPS Host: %5f GCUPS\n", mean_golden_gcup / n);
+	//////////// GCUP
+    printf("Mean GCUP Host: %5f GCUPs\n", mean_golden_gcup / n);
 
 	//	computing result using kernel
-	sw_maxi(lenA, seqA, lenB, seqB, wd, ws, gap_opening, enlargement, score, 0, INPUT_SIZE);
-	
+    char a_rev[INPUT_SIZE][MAX_DIM];
+    for(int i = 0; i < INPUT_SIZE; i++){
+    	copy_reversed_for: for (int j = 0; j < lenA[i]; j++) {
+    	        a_rev[i][j] = seqA[i][lenA[i] - j - 1];
+    	    }
+    }
+	sw_maxi(lenA, a_rev, lenB, seqB, wd, ws, gap_opening, enlargement, score, 0, n);
+
+	//	Score results
 	for (int i = 0; i < INPUT_SIZE; i++)
 	{
 		printConf(seqA[i], seqB[i], ws, wd, gap_opening, enlargement);
@@ -165,4 +173,14 @@ int compute_golden(int lenA, char *seqA, int lenB, char *seqB, int wd, int ws, i
 	    }
 
 	    return max_score;
+}
+
+void reverse_str(int len, char *str) {
+    int start = 0;
+    int end = len;
+    while (start < end) {
+        std::swap(str[start], str[end]);
+        start++;
+        end--;
+    }
 }
