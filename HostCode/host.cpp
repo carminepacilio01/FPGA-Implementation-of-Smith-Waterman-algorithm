@@ -52,9 +52,17 @@ int main(int argc, char* argv[]){
 		target[i][0] = database[i][0] = '-';
 		target[i][lenT[i]] = database[i][lenD[i]] = '\0';
 		random_seq_gen(lenT[i], target[i], lenD[i], database[i]);
-
+		
 		cell_number += lenD[i] * lenT[i];
 	}
+
+	// reverse the string
+		char t_rev[INPUT_SIZE][MAX_DIM];
+		for(int i = 0; i < INPUT_SIZE; i++){
+			copy_reversed_for: for (int j = 0; j < lenT[i]; j++) {
+					t_rev[i][j] = target[i][lenT[i] - j - 1];
+				}
+		}
 
 /////////////////////////		OPENCL CONFIGURATION 		////////////////////////////////////
 
@@ -91,7 +99,7 @@ int main(int argc, char* argv[]){
 
 	// Create device buffers
     cl::Buffer lenT_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, sizeof(int)*INPUT_SIZE, lenT.data());
-    cl::Buffer target_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, sizeof(char)*INPUT_SIZE*MAX_DIM, target);
+    cl::Buffer target_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, sizeof(char)*INPUT_SIZE*MAX_DIM, t_rev);
     cl::Buffer lenD_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, sizeof(int)*INPUT_SIZE, lenD.data());
 	cl::Buffer database_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, sizeof(char)*INPUT_SIZE*MAX_DIM, database);
     cl::Buffer score_buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_WRITE_ONLY, sizeof(int)*INPUT_SIZE, score.data());
