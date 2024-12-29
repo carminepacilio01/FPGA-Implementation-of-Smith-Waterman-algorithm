@@ -165,7 +165,7 @@ void writeOutput(int score_l[INPUT_SIZE], int score[INPUT_SIZE], int offset, int
 }
 
 //////////////////MASTER AXI
-// extern "C" {
+extern "C" {
     void sw_maxi(int lenT[INPUT_SIZE], char target[INPUT_SIZE][MAX_DIM], int lenD[INPUT_SIZE], char database[INPUT_SIZE][MAX_DIM],
     int wd, int ws, int gap_opening, int enlargement, int score[INPUT_SIZE],
     int offset, int input_len) {
@@ -213,4 +213,4 @@ void writeOutput(int score_l[INPUT_SIZE], int score[INPUT_SIZE], int offset, int
 
         writeOutput(score_l, score, offset, input_len);
     }
-//}
+}
