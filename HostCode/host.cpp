@@ -59,7 +59,7 @@ int main(int argc, char* argv[]){
 	// reverse the string
 		char t_rev[INPUT_SIZE][MAX_DIM];
 		for(int i = 0; i < INPUT_SIZE; i++){
-			copy_reversed_for: for (int j = 0; j < lenT[i]; j++) {
+			for (int j = 0; j < lenT[i]; j++) {
 					t_rev[i][j] = target[i][lenT[i] - j - 1];
 				}
 		}
@@ -134,7 +134,7 @@ int main(int argc, char* argv[]){
 	
 	//Launch the Kernels
 	auto start = std::chrono::high_resolution_clock::now();
-	for(int cu = 0; cu < 6; cu++) {
+	for(int cu = 0; cu < NUM_CU; cu++) {
 		OCL_CHECK(err, err = krnl.setArg(9, cu * INPUT_SIZE / 6));
 		OCL_CHECK(err, err = krnl.setArg(10, INPUT_SIZE / 6));
          q.enqueueTask(krnl);

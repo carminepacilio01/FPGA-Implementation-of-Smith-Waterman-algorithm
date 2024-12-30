@@ -8,18 +8,15 @@ void computeSW(int lenT, char *target, int lenD, char *database, conf_t scoring,
 //	initialize local buffer for the 3 dependency
 	short p_buffer[3][MAX_DIM];
 #pragma HLS ARRAY_PARTITION variable=p_buffer type=block factor=3 dim=1
-#pragma HLS ARRAY_PARTITION variable=p_buffer type=cyclic factor=4 dim=2
-#pragma HLS RESOURCE variable=p_buffer core=RAM_2P_BRAM
+#pragma HLS ARRAY_PARTITION variable=p_buffer type=cyclic factor=2 dim=2
 
 	short q_buffer[3][MAX_DIM];
 #pragma HLS ARRAY_PARTITION variable=q_buffer type=block factor=3 dim=1
-#pragma HLS ARRAY_PARTITION variable=q_buffer type=cyclic factor=4 dim=2
-#pragma HLS RESOURCE variable=q_buffer core=RAM_2P_BRAM
+#pragma HLS ARRAY_PARTITION variable=q_buffer type=cyclic factor=2 dim=2
 
 	short d_buffer[3][MAX_DIM];
 #pragma HLS ARRAY_PARTITION variable=d_buffer type=block factor=3 dim=1
-#pragma HLS ARRAY_PARTITION variable=d_buffer type=cyclic factor=4 dim=2
-#pragma HLS RESOURCE variable=d_buffer core=RAM_2P_BRAM
+#pragma HLS ARRAY_PARTITION variable=d_buffer type=cyclic factor=2 dim=2
 
     init_buffers_loop: for(int index = 0; index < MAX_DIM; index++) {
 #pragma HLS PIPELINE  II=1
@@ -84,7 +81,7 @@ void computeSW(int lenT, char *target, int lenD, char *database, conf_t scoring,
 #pragma HLS DEPENDENCE variable=d_buffer array inter false
 #pragma HLS DEPENDENCE variable=score_l inter false
 #pragma HLS DEPENDENCE variable=score_l intra false
-#pragma HLS UNROLL factor=4
+#pragma HLS UNROLL factor=2
 				if(j < diag_len) {
 					const int current_index = database_cursor + j;
 					const int two_diag = (diag_index == 0) ? 1 : (diag_index == 1) ? 2 : 0;
@@ -202,7 +199,7 @@ extern "C" {
         char db_local[INPUT_SIZE][MAX_DIM];
         int score_l[INPUT_SIZE];
 
-//#pragma HLS DATAFLOW
+#pragma HLS DATAFLOW
         readInput(lenT, lenT_local, target, t_local, lenD, lenD_local, database, db_local);
 
         compute_SW_loop: for (int i = 0; i < INPUT_SIZE; i++) {

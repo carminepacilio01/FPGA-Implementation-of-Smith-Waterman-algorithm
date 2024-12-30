@@ -12,6 +12,7 @@
 
 #define MAX_DIM 256
 #define MAX_SEQ_LEN MAX_DIM - 2
-#define INPUT_SIZE 6000
+#define INPUT_SIZE 5000
+#define NUM_CU 1
 
 #endif // _HOST_H
