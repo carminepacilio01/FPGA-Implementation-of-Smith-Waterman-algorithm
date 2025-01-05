@@ -198,8 +198,7 @@ extern "C" {
         int lenD_local[INPUT_SIZE];
         char db_local[INPUT_SIZE][MAX_DIM];
         int score_l[INPUT_SIZE];
-
-#pragma HLS DATAFLOW
+		
         readInput(lenT, lenT_local, target, t_local, lenD, lenD_local, database, db_local);
 
         compute_SW_loop: for (int i = 0; i < INPUT_SIZE; i++) {

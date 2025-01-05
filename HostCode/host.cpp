@@ -123,7 +123,6 @@ int main(int argc, char* argv[]){
 	OCL_CHECK(err, err = krnl.setArg(7, enlargement));
 	OCL_CHECK(err, err = krnl.setArg(8, score_buffer));
 
-
 	if (err != CL_SUCCESS) {
 		std::cout << "Error: Failed to set kernel arguments! " << err << std::endl;
 		std::cout << "Test failed" << std::endl;
@@ -134,9 +133,9 @@ int main(int argc, char* argv[]){
 	
 	//Launch the Kernels
 	auto start = std::chrono::high_resolution_clock::now();
-	for(int cu = 0; cu < NUM_CU; cu++) {
-		OCL_CHECK(err, err = krnl.setArg(9, cu * INPUT_SIZE / 6));
-		OCL_CHECK(err, err = krnl.setArg(10, INPUT_SIZE / 6));
+	for(int ker = 0; ker < NUM_KER; ker++) {
+		OCL_CHECK(err, err = krnl.setArg(9, ker * INPUT_SIZE / NUM_KER));
+		OCL_CHECK(err, err = krnl.setArg(10, INPUT_SIZE / NUM_KER));
          q.enqueueTask(krnl);
      }
 	q.finish();
