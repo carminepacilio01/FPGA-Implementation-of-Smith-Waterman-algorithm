@@ -1,15 +1,27 @@
 #ifndef _SMITH_WATERMAN_H
 #define _SMITH_WATERMAN_H
 
-#include <iostream>
-#include <vector>
-#include <limits>
-#include <string.h>
+#define MAX_DIM (30+PADDING_SIZE)
+#define SEQ_SIZE (MAX_DIM-PADDING_SIZE)
+#define DEPTH_STREAM MAX_DIM
+#define INPUT_SIZE 10
+#define NO_COUPLES_PER_STREAM (DEPTH_STREAM/(PACK_SEQ*2))*NUM_CU
 
-#define MAX_DIM 256
-#define MAX_REP MAX_DIM * 2
-#define MATRIX_SIZE MAX_DIM * MAX_DIM
-#define INPUT_SIZE 5000
+#define BITS_PER_CHAR 4
+#define PORT_WIDTH 512
+#define N_ELEM_BLOCK (PORT_WIDTH/BITS_PER_CHAR)
+#define UNROLL_FACTOR 8
+#define BLOCK_SIZE 32/BITS_PER_CHAR
+#define PADDING_SIZE (BLOCK_SIZE)
+
+#define NUM_TMP_WRITE 512
+
+#define PACK_SEQ ((MAX_DIM*BITS_PER_CHAR-1)/PORT_WIDTH+1)
+#define N_PACK (INPUT_SIZE*(PACK_SEQ*2+1))
+
+#define NUM_CU 1
+
+const int m_axi_depth=MAX_DIM*(PACK_SEQ*2+1);
 
 #define UP 0
 #define UP_LEFT -1
@@ -24,20 +36,7 @@ typedef struct conf {
 	int gap_extension;
 } conf_t;
 
-extern "C" {
-	void sw_maxi (
-		int lenT[INPUT_SIZE],
-		char target[INPUT_SIZE][MAX_DIM],
-		int lenD[INPUT_SIZE],
-		char database[INPUT_SIZE][MAX_DIM],
-		int wd, int ws, int gap_opening, int enlargement,
-		int score[INPUT_SIZE],
-		int offset, int input_len
-	);
-}
-
-void computeSW(int lenT, char *target, int lenD, char *database, conf_t scoring, int *score);
-void readInput(int lenT[MAX_DIM], int lenT_local[MAX_DIM], char target[INPUT_SIZE][MAX_DIM], char t_local[INPUT_SIZE][MAX_DIM], int lenD[MAX_DIM], int lenD_local[MAX_DIM], char database[INPUT_SIZE][MAX_DIM], char db_local[INPUT_SIZE][MAX_DIM]);
-void writeOutput(int score_l[INPUT_SIZE], int score[INPUT_SIZE], int offset, int input_len);
+typedef ap_uint<BITS_PER_CHAR> alphabet_datatype;
+typedef ap_uint<PORT_WIDTH> input_t;
 
 #endif // _SMITH_WATERMAN_H

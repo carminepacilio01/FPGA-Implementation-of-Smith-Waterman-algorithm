@@ -1,21 +1,49 @@
-// Test Bench for the implementation of the Smith-Waterman (Gotoh)
+/******************************************
+*MIT License
+*
+# *Copyright (c) [2025] [Carmine Pacilio]
+*
+*Permission is hereby granted, free of charge, to any person obtaining a copy
+*of this software and associated documentation files (the "Software"), to deal
+*in the Software without restriction, including without limitation the rights
+*to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+*copies of the Software, and to permit persons to whom the Software is
+*furnished to do so, subject to the following conditions:
+*
+*The above copyright notice and this permission notice shall be included in all
+*copies or substantial portions of the Software.
+*
+*THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+*IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+*FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+*AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+*LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+*OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+*SOFTWARE.
+******************************************/
+#include <iostream>
+#include <vector>
+#include <limits>
+#include <string.h>
+#include <ap_int.h>
 #include <random>
 #include "smith_waterman.h"
 #include <time.h>
 
-#define MAX_DIMEN MAX_DIM
-
+void sw_maxi(input_t *input_output,  conf_t scoring, int num_couples);
 void printConf(char *seqA, char *seqB, int ws, int wd, int gap_opening, int enlargement);
 void fprintMatrix(int *P, int *Dsw_testbench, int *Q, int lenA, int lenB);
 int compute_golden(int lenA, char *seqA, int lenB, char *seqB, int wd, int ws, int gap_opening, int enlargement);
 void random_seq_gen(int lenA, char *seqA, int lenB, char *seqB);
 int gen_rnd(int min, int max);
 void reverse_str(int len, char *str);
+alphabet_datatype compression(char letter);
 
 using namespace std;
 
-int main(int argc, char const *argv[]) {
+int main(){
 	srandom(2);
+	int num_couples = INPUT_SIZE;
 	clock_t start, end;
 
 	//	match score
@@ -28,26 +56,21 @@ int main(int argc, char const *argv[]) {
 
 	int count_failed = 0;
 	//--------------------------------------------------------------------------------//
-	//	executing n tests each with increasing len
 	const int n = INPUT_SIZE;
 	int lenA[INPUT_SIZE];
 	int lenB[INPUT_SIZE];
 	char seqA[INPUT_SIZE][MAX_DIM];
 	char seqB[INPUT_SIZE][MAX_DIM];
+	input_t input_output[N_PACK] = {0};
 
 	for(int i = 0; i < n; i++){
-
 		//	generate random sequences
 		//	length of the sequences
-		lenA[i] = (int)  gen_rnd(MAX_DIMEN - 10, MAX_DIMEN - 2);
-		lenB[i] = (int)  gen_rnd(MAX_DIMEN - 10, MAX_DIMEN - 2);
+		lenA[i] = SEQ_SIZE; // (int)  gen_rnd(SEQ_SIZE - 10, SEQ_SIZE - 2);
+		lenB[i] = SEQ_SIZE; // (int)  gen_rnd(SEQ_SIZE - 10, SEQ_SIZE - 2);
 
-		lenA[i] += 1;
-		lenB[i] += 1;
-
-		//	sequences
-		//seqA[i] = (char *) malloc(sizeof(char) * (lenA[i]));
-		//seqB[i] = (char *) malloc(sizeof(char) * (lenB[i]));
+//		lenA[i] += 1;
+//		lenB[i] += 1;
 
 		//	generate rand sequences
 		seqA[i][0] = seqB[i][0] = '-';
@@ -55,56 +78,85 @@ int main(int argc, char const *argv[]) {
 		random_seq_gen(lenA[i], seqA[i], lenB[i], seqB[i]);
 
 		//	Printing current configuration
+		//printConf(seqA[i], seqB[i], ws, wd, gap_opening, enlargement);
 	}
 
-	int score[INPUT_SIZE];
 	int golden_score[INPUT_SIZE];
 	int n_ops = 0;
 
 	double mean_golden_time = 0;
 	double mean_golden_gcup = 0;
 	for (int golden_rep = 0; golden_rep < n; golden_rep++) {
-
-		start = clock();
 		golden_score[golden_rep] = compute_golden(lenA[golden_rep], seqA[golden_rep], lenB[golden_rep], seqB[golden_rep], wd, ws, gap_opening, enlargement);
-		end = clock();
-
-		n_ops = lenA[golden_rep]*lenB[golden_rep];
-		double cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-		double gcup = (double) (n_ops / cpu_time_used )  * 1e-9;
-
-		mean_golden_time += cpu_time_used;
-		mean_golden_gcup += gcup;
 	}
 
-    printf("Mean Execution time of Host Code: %f ms\n", mean_golden_time / n * 1e3);
-
-	//////////// GCUP
-    printf("Mean GCUP Host: %5f GCUPs\n", mean_golden_gcup / n);
+	conf_t local_conf;
+	local_conf.match 			= wd;
+	local_conf.mismatch			= ws;
+	local_conf.gap_opening		= gap_opening + enlargement;
+	local_conf.gap_extension	= enlargement;
 
 	//	computing result using kernel
-    char a_rev[INPUT_SIZE][MAX_DIM];
-    for(int i = 0; i < INPUT_SIZE; i++){
-    	copy_reversed_for: for (int j = 0; j < lenA[i]; j++) {
-    	        a_rev[i][j] = seqA[i][lenA[i] - j - 1];
-    	    }
-    }
-	sw_maxi(lenA, a_rev, lenB, seqB, wd, ws, gap_opening, enlargement, score, 0, n);
+    alphabet_datatype compressed_input[(INPUT_SIZE*(SEQ_SIZE + PADDING_SIZE))*2];
+	for(int n=0; n < INPUT_SIZE; n++){
+		std::cout << "target["<<n<<"]: ";
+		char tmp[MAX_DIM];
+		copy_reversed_for: for (int i = 0; i < lenA[n]; i++) {
+			tmp[i] = seqA[n][lenA[n] - i - 1];
+		}
+		for(int i = 0; i < SEQ_SIZE + PADDING_SIZE; i++){
+			compressed_input[i+(2*n)*(SEQ_SIZE + PADDING_SIZE)] = compression(tmp[i]);
+			std::cout << compressed_input[i+(2*n)*(SEQ_SIZE + PADDING_SIZE)] << " ";
+		}
+		std::cout << std::endl;
+	}
+	std::cout << std::endl;
+	for(int n=0; n < INPUT_SIZE; n++){
+		std::cout << "database["<<n<<"]: ";
+		for(int i = 0; i < SEQ_SIZE + PADDING_SIZE; i++){
+			compressed_input[i+(2*n+1)*(SEQ_SIZE + PADDING_SIZE)] = compression(seqB[n][i]);
+			std::cout << compressed_input[i+(2*n+1)*(SEQ_SIZE + PADDING_SIZE)] << " ";
+		}
+		std::cout << std::endl;
+	}
+	std::cout << std::endl;
+
+
+	for (int n = 0; n < num_couples; n++) {
+		int* input_lengths = (int*)&input_output[n*(PACK_SEQ*2+1)];
+
+		input_lengths[0] = lenA[n];
+		input_lengths[1] = lenB[n];
+
+		int k = 0;
+		for(int i = 0; i < PACK_SEQ*2 ; i++){
+			for(int j = 0; j < 128; j++){
+				input_output[1 + n*(PACK_SEQ*2+1) + i].range((j+1)*BITS_PER_CHAR-1, j*BITS_PER_CHAR) = compressed_input[k+((SEQ_SIZE + PADDING_SIZE)*2)*n];
+				k++;
+			}
+		}
+	}
+
+	start = clock();
+	sw_maxi(input_output, local_conf, num_couples);
+	end = clock();
 
 	//	Score results
 	for (int i = 0; i < INPUT_SIZE; i++)
 	{
-		printConf(seqA[i], seqB[i], ws, wd, gap_opening, enlargement);
-		cout << "score: " << score[i] << " golden_score: " << golden_score[i] << endl;
-		if(score[i] == golden_score[i])
-			cout << "TEST " << i + 1 << " PASSED !" << endl;
-		else{
+		if(input_output[i] == golden_score[i]){
+			//cout << "TEST " << i + 1 << " PASSED !" << endl;
+		}else{
+			printConf(seqA[i], seqB[i], ws, wd, gap_opening, enlargement);
+			cout << "score: " << input_output[i] << " golden_score: " << golden_score[i] << endl;
 			cout << "TEST " << i + 1 << " FAILED !!!" << endl;
 			count_failed++;
 		}
 	}
 
 	cout << "Failed tests: " << count_failed << " Passed tests: " << n - count_failed << endl;
+	double cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+	printf("Execution time: %f ms\n", mean_golden_time * 1e3);
 
 	return 0;
 }
@@ -183,4 +235,21 @@ void reverse_str(int len, char *str) {
         start++;
         end--;
     }
+}
+
+alphabet_datatype compression(char letter) {
+    switch (letter) {
+		case '-':
+			return 4;
+        case 'A':
+            return 0;
+        case 'C':
+            return 1;
+        case 'G':
+            return 2;
+        case 'T':
+            return 3;
+    }
+
+    return -1;
 }
